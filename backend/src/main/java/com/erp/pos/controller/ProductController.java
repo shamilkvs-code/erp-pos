@@ -10,6 +10,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -18,16 +21,48 @@ public class ProductController {
     @Autowired
     private ProductService productService;
 
+    @GetMapping("/test")
+    public ResponseEntity<String> testEndpoint() {
+        return new ResponseEntity<>("Product API is working!", HttpStatus.OK);
+    }
+
     @GetMapping
-    public ResponseEntity<List<Product>> getAllProducts() {
+    public ResponseEntity<?> getAllProducts() {
+        System.out.println("Getting all products...");
         List<Product> products = productService.getAllProducts();
-        return new ResponseEntity<>(products, HttpStatus.OK);
+        System.out.println("Found " + products.size() + " products");
+        for (Product product : products) {
+            System.out.println("Product: " + product.getName() + ", ID: " + product.getId());
+        }
+
+        // Create a simple response with just the product names
+        List<String> productNames = new ArrayList<>();
+        for (Product product : products) {
+            productNames.add(product.getName());
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("productNames", productNames);
+        response.put("count", products.size());
+        response.put("message", "Products retrieved successfully");
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getProductById(@PathVariable Long id) {
+    public ResponseEntity<?> getProductById(@PathVariable Long id) {
+        System.out.println("Getting product with ID: " + id);
         Product product = productService.getProductById(id);
-        return new ResponseEntity<>(product, HttpStatus.OK);
+        System.out.println("Found product: " + product.getName());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", product.getId());
+        response.put("name", product.getName());
+        response.put("price", product.getPrice());
+        response.put("description", product.getDescription());
+        response.put("stockQuantity", product.getStockQuantity());
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/category/{categoryId}")

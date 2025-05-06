@@ -1,0 +1,119 @@
+package com.erp.pos.service.impl;
+
+import com.erp.pos.exception.ResourceNotFoundException;
+import com.erp.pos.model.Order;
+import com.erp.pos.model.RestaurantTable;
+import com.erp.pos.repository.TableRepository;
+import com.erp.pos.service.TableService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class TableServiceImpl implements TableService {
+
+    @Autowired
+    private TableRepository tableRepository;
+
+    @Override
+    public List<RestaurantTable> getAllTables() {
+        return tableRepository.findAll();
+    }
+
+    @Override
+    public RestaurantTable getTableById(Long id) {
+        return tableRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Table not found with id: " + id));
+    }
+
+    @Override
+    public Optional<RestaurantTable> getTableByNumber(String tableNumber) {
+        return tableRepository.findByTableNumber(tableNumber);
+    }
+
+    @Override
+    public List<RestaurantTable> getTablesByStatus(RestaurantTable.TableStatus status) {
+        return tableRepository.findByStatus(status);
+    }
+
+    @Override
+    public List<RestaurantTable> getTablesByLocation(String location) {
+        return tableRepository.findByLocation(location);
+    }
+
+    @Override
+    public List<RestaurantTable> getTablesByMinCapacity(Integer capacity) {
+        return tableRepository.findByCapacityGreaterThanEqual(capacity);
+    }
+
+    @Override
+    @Transactional
+    public RestaurantTable createTable(RestaurantTable table) {
+        // Set default status if not provided
+        if (table.getStatus() == null) {
+            table.setStatus(RestaurantTable.TableStatus.AVAILABLE);
+        }
+
+        return tableRepository.save(table);
+    }
+
+    @Override
+    @Transactional
+    public RestaurantTable updateTable(Long id, RestaurantTable tableDetails) {
+        RestaurantTable table = getTableById(id);
+
+        table.setTableNumber(tableDetails.getTableNumber());
+        table.setCapacity(tableDetails.getCapacity());
+        table.setStatus(tableDetails.getStatus());
+        table.setLocation(tableDetails.getLocation());
+
+        return tableRepository.save(table);
+    }
+
+    @Override
+    @Transactional
+    public void deleteTable(Long id) {
+        RestaurantTable table = getTableById(id);
+        tableRepository.delete(table);
+    }
+
+    @Override
+    @Transactional
+    public RestaurantTable assignOrderToTable(Long tableId, Order order) {
+        RestaurantTable table = getTableById(tableId);
+
+        // Check if table is available
+        if (table.getStatus() != RestaurantTable.TableStatus.AVAILABLE && table.getStatus() != RestaurantTable.TableStatus.RESERVED) {
+            throw new IllegalStateException("Table is not available for assignment");
+        }
+
+        table.setCurrentOrder(order);
+        table.setStatus(RestaurantTable.TableStatus.OCCUPIED);
+
+        return tableRepository.save(table);
+    }
+
+    @Override
+    @Transactional
+    public RestaurantTable clearTable(Long tableId) {
+        RestaurantTable table = getTableById(tableId);
+
+        table.setCurrentOrder(null);
+        table.setStatus(RestaurantTable.TableStatus.CLEANING);
+
+        return tableRepository.save(table);
+    }
+
+    @Override
+    @Transactional
+    public RestaurantTable changeTableStatus(Long tableId, RestaurantTable.TableStatus status) {
+        RestaurantTable table = getTableById(tableId);
+
+        table.setStatus(status);
+
+        return tableRepository.save(table);
+    }
+}

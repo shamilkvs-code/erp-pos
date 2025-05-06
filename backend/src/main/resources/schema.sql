@@ -1,12 +1,13 @@
--- Drop tables if they exist
-DROP TABLE IF EXISTS order_items;
-DROP TABLE IF EXISTS orders;
-DROP TABLE IF EXISTS products;
-DROP TABLE IF EXISTS categories;
-DROP TABLE IF EXISTS user_roles;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS roles;
-DROP TABLE IF EXISTS customers;
+-- Drop tables if they exist (in correct order to respect foreign key constraints)
+DROP TABLE IF EXISTS order_items CASCADE;
+DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS restaurant_tables CASCADE;
+DROP TABLE IF EXISTS products CASCADE;
+DROP TABLE IF EXISTS categories CASCADE;
+DROP TABLE IF EXISTS user_roles CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS roles CASCADE;
+DROP TABLE IF EXISTS customers CASCADE;
 
 -- Create roles table
 CREATE TABLE roles (
@@ -79,14 +80,36 @@ CREATE TABLE orders (
     customer_id BIGINT,
     user_id BIGINT,
     total_amount DECIMAL(10, 2) NOT NULL,
-    status VARCHAR(20) NOT NULL,
-    payment_method VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('PENDING', 'IN_PROGRESS', 'READY', 'COMPLETED', 'CANCELLED')),
+    payment_method VARCHAR(20) CHECK (payment_method IN ('CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'MOBILE_PAYMENT')),
     payment_reference VARCHAR(100),
+    table_id BIGINT,
+    order_type VARCHAR(20) CHECK (order_type IN ('DINE_IN', 'TAKEOUT', 'DELIVERY')),
+    number_of_guests INTEGER,
+    special_instructions TEXT,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     FOREIGN KEY (customer_id) REFERENCES customers(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+-- Create restaurant_tables table
+CREATE TABLE restaurant_tables (
+    id SERIAL PRIMARY KEY,
+    table_number VARCHAR(50) NOT NULL UNIQUE,
+    capacity INTEGER NOT NULL,
+    status VARCHAR(20) CHECK (status IN ('AVAILABLE', 'OCCUPIED', 'RESERVED', 'CLEANING')),
+    location VARCHAR(50),
+    current_order_id BIGINT,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+-- Add foreign key for table_id in orders table
+ALTER TABLE orders ADD CONSTRAINT fk_orders_table FOREIGN KEY (table_id) REFERENCES restaurant_tables(id);
+
+-- Add foreign key for current_order_id in restaurant_tables table
+ALTER TABLE restaurant_tables ADD CONSTRAINT fk_tables_current_order FOREIGN KEY (current_order_id) REFERENCES orders(id);
 
 -- Create order_items table
 CREATE TABLE order_items (

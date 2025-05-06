@@ -1,7 +1,8 @@
 import axios from 'axios';
 import authHeader from './AuthHeader';
+import { PRODUCTS_API_URL } from '../config/api.config';
 
-const API_URL = 'http://localhost:8080/api/products/';
+const API_URL = `${PRODUCTS_API_URL}/products/`;
 
 class ProductService {
   getAllProducts() {

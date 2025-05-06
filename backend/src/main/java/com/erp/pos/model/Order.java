@@ -34,6 +34,10 @@ public class Order extends BaseEntity {
     @JoinColumn(name = "user_id")
     private User createdBy;
 
+    @ManyToOne
+    @JoinColumn(name = "table_id")
+    private RestaurantTable table;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
@@ -44,12 +48,23 @@ public class Order extends BaseEntity {
     private OrderStatus status;
 
     @Enumerated(EnumType.STRING)
+    private OrderType orderType;
+
+    @Enumerated(EnumType.STRING)
     private PaymentMethod paymentMethod;
 
     private String paymentReference;
 
+    private Integer numberOfGuests;
+
+    private String specialInstructions;
+
     public enum OrderStatus {
-        PENDING, COMPLETED, CANCELLED
+        PENDING, IN_PROGRESS, READY, COMPLETED, CANCELLED
+    }
+
+    public enum OrderType {
+        DINE_IN, TAKEOUT, DELIVERY
     }
 
     public enum PaymentMethod {

@@ -1,7 +1,8 @@
 const axios = require('axios');
+const { AUTH_API_URL, PRODUCTS_API_URL } = require('./test-config.cjs');
 
-const API_URL = 'http://localhost:8080/api/auth/';
-const PRODUCTS_URL = 'http://localhost:8080/api/products';
+const API_URL = `${AUTH_API_URL}/`;
+const PRODUCTS_URL = PRODUCTS_API_URL;
 
 async function testProducts() {
   try {
@@ -10,18 +11,18 @@ async function testProducts() {
       username: 'admin',
       password: 'admin123'
     });
-    
+
     console.log('Login successful!');
-    
+
     const token = loginResponse.data.token;
-    
+
     // Get products
     const productsResponse = await axios.get(PRODUCTS_URL, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
-    
+
     console.log('Products retrieved successfully!');
     console.log('Products:', productsResponse.data);
   } catch (error) {

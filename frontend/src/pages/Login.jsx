@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { TextField, Button, Box, Typography, Alert } from '@mui/material';
-import AuthService from '../services/AuthService';
+import { login } from '../services/api';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -21,22 +21,15 @@ const Login = () => {
       return;
     }
 
-    AuthService.login(username, password).then(
-      () => {
+    login(username, password)
+      .then(() => {
         navigate('/dashboard');
-      },
-      (error) => {
-        const resMessage =
-          (error.response &&
-            error.response.data &&
-            error.response.data.message) ||
-          error.message ||
-          error.toString();
-
         setLoading(false);
-        setMessage(resMessage);
-      }
-    );
+      })
+      .catch(error => {
+        setLoading(false);
+        setMessage(error.response?.data?.message || 'An error occurred during login');
+      });
   };
 
   return (
