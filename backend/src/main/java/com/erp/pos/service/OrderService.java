@@ -13,6 +13,8 @@ public interface OrderService {
     List<Order> getOrdersByCustomerId(Long customerId);
     List<Order> getOrdersByUserId(Long userId);
     List<Order> getOrdersByStatus(Order.OrderStatus status);
+    List<Order> getOrdersByType(Order.OrderType orderType);
+    List<Order> getOrdersByTableId(Long tableId);
     Order createOrder(Order order);
     Order updateOrder(Long id, Order order);
     void deleteOrder(Long id);

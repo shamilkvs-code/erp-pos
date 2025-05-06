@@ -56,6 +56,16 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public List<Order> getOrdersByType(Order.OrderType orderType) {
+        return orderRepository.findByOrderType(orderType);
+    }
+
+    @Override
+    public List<Order> getOrdersByTableId(Long tableId) {
+        return orderRepository.findByTableId(tableId);
+    }
+
+    @Override
     @Transactional
     public Order createOrder(Order order) {
         // Generate a unique order number if not provided

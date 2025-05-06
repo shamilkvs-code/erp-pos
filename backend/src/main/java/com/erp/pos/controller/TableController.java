@@ -173,4 +173,48 @@ public class TableController {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
     }
+
+    /**
+     * Update table position (for floor plan)
+     */
+    @PatchMapping("/{tableId}/position")
+    @PreAuthorize("hasRole('MANAGER') or hasRole('ADMIN')")
+    public ResponseEntity<RestaurantTable> updateTablePosition(
+            @PathVariable Long tableId,
+            @RequestBody Map<String, Object> positionUpdate) {
+
+        RestaurantTable table = tableService.getTableById(tableId);
+
+        if (positionUpdate.containsKey("positionX")) {
+            table.setPositionX((Integer) positionUpdate.get("positionX"));
+        }
+
+        if (positionUpdate.containsKey("positionY")) {
+            table.setPositionY((Integer) positionUpdate.get("positionY"));
+        }
+
+        if (positionUpdate.containsKey("width")) {
+            table.setWidth((Integer) positionUpdate.get("width"));
+        }
+
+        if (positionUpdate.containsKey("height")) {
+            table.setHeight((Integer) positionUpdate.get("height"));
+        }
+
+        if (positionUpdate.containsKey("shape")) {
+            table.setShape((String) positionUpdate.get("shape"));
+        }
+
+        RestaurantTable updatedTable = tableService.updateTable(tableId, table);
+        return new ResponseEntity<>(updatedTable, HttpStatus.OK);
+    }
+
+    /**
+     * Get floor plan (all tables with position information)
+     */
+    @GetMapping("/floor-plan")
+    public ResponseEntity<List<RestaurantTable>> getFloorPlan() {
+        List<RestaurantTable> tables = tableService.getAllTables();
+        return new ResponseEntity<>(tables, HttpStatus.OK);
+    }
 }

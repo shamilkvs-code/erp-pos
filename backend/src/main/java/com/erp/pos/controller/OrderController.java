@@ -181,9 +181,7 @@ public class OrderController {
     public ResponseEntity<List<Order>> getOrdersByType(@PathVariable String orderType) {
         try {
             Order.OrderType type = Order.OrderType.valueOf(orderType.toUpperCase());
-            List<Order> orders = orderService.getAllOrders().stream()
-                .filter(order -> order.getOrderType() == type)
-                .toList();
+            List<Order> orders = orderService.getOrdersByType(type);
             return new ResponseEntity<>(orders, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
@@ -196,10 +194,10 @@ public class OrderController {
     @GetMapping("/table/{tableId}")
     @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
     public ResponseEntity<List<Order>> getOrdersByTable(@PathVariable Long tableId) {
-        RestaurantTable table = tableService.getTableById(tableId);
-        List<Order> orders = orderService.getAllOrders().stream()
-            .filter(order -> order.getTable() != null && order.getTable().getId().equals(tableId))
-            .toList();
+        // Verify the table exists
+        tableService.getTableById(tableId);
+        // Get orders for this table
+        List<Order> orders = orderService.getOrdersByTableId(tableId);
         return new ResponseEntity<>(orders, HttpStatus.OK);
     }
 

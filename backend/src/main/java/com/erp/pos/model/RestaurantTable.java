@@ -19,21 +19,28 @@ public class RestaurantTable extends BaseEntity {
 
     @NotBlank
     private String tableNumber;
-    
+
     @NotNull
     @Positive
     private Integer capacity;
-    
+
     @Enumerated(EnumType.STRING)
     private TableStatus status;
-    
+
     @ManyToOne
     @JoinColumn(name = "current_order_id")
     private Order currentOrder;
-    
-    private String location; // e.g., "Indoor", "Outdoor", "Balcony", etc.
-    
+
+    private String location; // e.g., "MAIN", "OUTDOOR", "PRIVATE", "BAR", etc.
+
+    // Position for visual floor plan
+    private Integer positionX;
+    private Integer positionY;
+    private Integer width;
+    private Integer height;
+    private String shape; // "RECTANGLE", "CIRCLE", "CUSTOM"
+
     public enum TableStatus {
-        AVAILABLE, OCCUPIED, RESERVED, CLEANING
+        AVAILABLE, OCCUPIED, RESERVED, CLEANING, MAINTENANCE
     }
 }
