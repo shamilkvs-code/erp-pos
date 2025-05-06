@@ -14,6 +14,8 @@ import Register from './pages/Register';
 import Products from './pages/Products';
 import Customers from './pages/Customers';
 import Orders from './pages/Orders';
+import Tables from './pages/Tables';
+import TableOrder from './pages/TableOrder';
 import NotFound from './pages/NotFound';
 
 // Services
@@ -62,6 +64,8 @@ function App() {
             <Route path="products" element={<Products />} />
             <Route path="customers" element={<Customers />} />
             <Route path="orders" element={<Orders />} />
+            <Route path="tables" element={<Tables />} />
+            <Route path="tables/:tableId/order" element={<TableOrder />} />
           </Route>
 
           {/* 404 Route */}

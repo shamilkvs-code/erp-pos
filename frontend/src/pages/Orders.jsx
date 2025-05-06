@@ -32,11 +32,16 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   KeyboardArrowDown as KeyboardArrowDownIcon,
-  KeyboardArrowUp as KeyboardArrowUpIcon
+  KeyboardArrowUp as KeyboardArrowUpIcon,
+  TableRestaurant as TableIcon
 } from '@mui/icons-material';
-
-// In a real app, we would import an OrderService
-// import OrderService from '../services/OrderService';
+import {
+  getAllOrders,
+  createOrder,
+  updateOrder,
+  deleteOrder,
+  getOrdersByType
+} from '../services/api';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -44,6 +49,7 @@ const Orders = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [openRows, setOpenRows] = useState({});
+  const [orderTypeFilter, setOrderTypeFilter] = useState('ALL');
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -51,76 +57,42 @@ const Orders = () => {
   });
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setOrders([
-        {
-          id: 1,
-          orderNumber: 'ORD-001',
-          orderDate: '2023-05-15',
-          customer: { id: 1, name: 'John Doe' },
-          totalAmount: 125.50,
-          status: 'COMPLETED',
-          paymentMethod: 'CREDIT_CARD',
-          items: [
-            { id: 1, product: { id: 1, name: 'Laptop' }, quantity: 1, unitPrice: 100.00, subtotal: 100.00 },
-            { id: 2, product: { id: 2, name: 'Mouse' }, quantity: 1, unitPrice: 25.50, subtotal: 25.50 }
-          ]
-        },
-        {
-          id: 2,
-          orderNumber: 'ORD-002',
-          orderDate: '2023-05-14',
-          customer: { id: 2, name: 'Jane Smith' },
-          totalAmount: 89.99,
-          status: 'COMPLETED',
-          paymentMethod: 'CASH',
-          items: [
-            { id: 3, product: { id: 3, name: 'Headphones' }, quantity: 1, unitPrice: 89.99, subtotal: 89.99 }
-          ]
-        },
-        {
-          id: 3,
-          orderNumber: 'ORD-003',
-          orderDate: '2023-05-14',
-          customer: { id: 3, name: 'Bob Johnson' },
-          totalAmount: 210.75,
-          status: 'PENDING',
-          paymentMethod: 'DEBIT_CARD',
-          items: [
-            { id: 4, product: { id: 4, name: 'Monitor' }, quantity: 1, unitPrice: 199.99, subtotal: 199.99 },
-            { id: 5, product: { id: 5, name: 'HDMI Cable' }, quantity: 1, unitPrice: 10.76, subtotal: 10.76 }
-          ]
-        },
-        {
-          id: 4,
-          orderNumber: 'ORD-004',
-          orderDate: '2023-05-13',
-          customer: { id: 4, name: 'Alice Brown' },
-          totalAmount: 45.25,
-          status: 'COMPLETED',
-          paymentMethod: 'MOBILE_PAYMENT',
-          items: [
-            { id: 6, product: { id: 6, name: 'USB Drive' }, quantity: 2, unitPrice: 22.50, subtotal: 45.00 },
-            { id: 7, product: { id: 7, name: 'Sticker' }, quantity: 1, unitPrice: 0.25, subtotal: 0.25 }
-          ]
-        },
-        {
-          id: 5,
-          orderNumber: 'ORD-005',
-          orderDate: '2023-05-12',
-          customer: { id: 5, name: 'Charlie Wilson' },
-          totalAmount: 320.00,
-          status: 'CANCELLED',
-          paymentMethod: 'CREDIT_CARD',
-          items: [
-            { id: 8, product: { id: 8, name: 'Smartphone' }, quantity: 1, unitPrice: 320.00, subtotal: 320.00 }
-          ]
-        }
-      ]);
+    fetchOrders();
+  }, [orderTypeFilter]);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      // Fetch orders from the API
+      let data;
+      if (orderTypeFilter === 'ALL') {
+        data = await getAllOrders();
+      } else {
+        data = await getOrdersByType(orderTypeFilter);
+      }
+
+      setOrders(data);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to load orders: ' + (error.response?.data?.message || error.message),
+        severity: 'error'
+      });
+      setOrders([]);
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
+
+  const handleOrderTypeFilterChange = (event) => {
+    setOrderTypeFilter(event.target.value);
+    setPage(0); // Reset to first page when filter changes
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, [orderTypeFilter]);
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -152,7 +124,20 @@ const Orders = () => {
   };
 
   const formatPaymentMethod = (method) => {
-    return method.replace('_', ' ');
+    return method ? method.replace('_', ' ') : 'N/A';
+  };
+
+  const getOrderTypeLabel = (type) => {
+    switch (type) {
+      case 'DINE_IN':
+        return 'Dine In';
+      case 'TAKEOUT':
+        return 'Takeout';
+      case 'DELIVERY':
+        return 'Delivery';
+      default:
+        return type;
+    }
   };
 
   const handleCloseSnackbar = () => {
@@ -165,19 +150,36 @@ const Orders = () => {
         <Typography variant="h4" component="h1">
           Orders
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setSnackbar({
-              open: true,
-              message: 'Order creation would be implemented in a real app',
-              severity: 'info'
-            });
-          }}
-        >
-          New Order
-        </Button>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <FormControl sx={{ minWidth: 150, mr: 2 }}>
+            <InputLabel id="order-type-filter-label">Order Type</InputLabel>
+            <Select
+              labelId="order-type-filter-label"
+              id="order-type-filter"
+              value={orderTypeFilter}
+              label="Order Type"
+              onChange={handleOrderTypeFilterChange}
+            >
+              <MenuItem value="ALL">All Orders</MenuItem>
+              <MenuItem value="DINE_IN">Dine In</MenuItem>
+              <MenuItem value="TAKEOUT">Takeout</MenuItem>
+              <MenuItem value="DELIVERY">Delivery</MenuItem>
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setSnackbar({
+                open: true,
+                message: 'Order creation would be implemented in a real app',
+                severity: 'info'
+              });
+            }}
+          >
+            New Order
+          </Button>
+        </Box>
       </Box>
 
       {loading ? (
@@ -194,6 +196,8 @@ const Orders = () => {
                   <TableCell>Order #</TableCell>
                   <TableCell>Date</TableCell>
                   <TableCell>Customer</TableCell>
+                  <TableCell>Type</TableCell>
+                  <TableCell>Table</TableCell>
                   <TableCell>Total</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Payment</TableCell>
@@ -216,7 +220,21 @@ const Orders = () => {
                         </TableCell>
                         <TableCell>{order.orderNumber}</TableCell>
                         <TableCell>{order.orderDate}</TableCell>
-                        <TableCell>{order.customer.name}</TableCell>
+                        <TableCell>{order.customer?.name || 'N/A'}</TableCell>
+                        <TableCell>{order.orderType ? getOrderTypeLabel(order.orderType) : 'N/A'}</TableCell>
+                        <TableCell>
+                          {order.table ? (
+                            <Chip
+                              icon={<TableIcon fontSize="small" />}
+                              label={`Table ${order.table.tableNumber}`}
+                              size="small"
+                              color="primary"
+                              variant="outlined"
+                            />
+                          ) : (
+                            'N/A'
+                          )}
+                        </TableCell>
                         <TableCell>${order.totalAmount.toFixed(2)}</TableCell>
                         <TableCell>
                           <Chip
@@ -254,7 +272,7 @@ const Orders = () => {
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
+                        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={10}>
                           <Collapse in={openRows[order.id]} timeout="auto" unmountOnExit>
                             <Box sx={{ margin: 2 }}>
                               <Typography variant="h6" gutterBottom component="div">
@@ -288,7 +306,7 @@ const Orders = () => {
                   ))}
                 {orders.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
+                    <TableCell colSpan={10} align="center">
                       No orders found
                     </TableCell>
                   </TableRow>

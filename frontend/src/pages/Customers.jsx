@@ -25,9 +25,12 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon
 } from '@mui/icons-material';
-
-// In a real app, we would import a CustomerService
-// import CustomerService from '../services/CustomerService';
+import {
+  getAllCustomers,
+  createCustomer,
+  updateCustomer,
+  deleteCustomer
+} from '../services/api';
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -48,18 +51,27 @@ const Customers = () => {
   });
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setCustomers([
-        { id: 1, name: 'John Doe', email: 'john@example.com', phone: '555-1234', address: '123 Main St' },
-        { id: 2, name: 'Jane Smith', email: 'jane@example.com', phone: '555-5678', address: '456 Oak Ave' },
-        { id: 3, name: 'Bob Johnson', email: 'bob@example.com', phone: '555-9012', address: '789 Pine Rd' },
-        { id: 4, name: 'Alice Brown', email: 'alice@example.com', phone: '555-3456', address: '321 Elm St' },
-        { id: 5, name: 'Charlie Wilson', email: 'charlie@example.com', phone: '555-7890', address: '654 Maple Dr' }
-      ]);
-      setLoading(false);
-    }, 1000);
+    fetchCustomers();
   }, []);
+
+  const fetchCustomers = async () => {
+    setLoading(true);
+    try {
+      // Fetch customers from the API
+      const data = await getAllCustomers();
+      setCustomers(data);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to load customers: ' + (error.response?.data?.message || error.message),
+        severity: 'error'
+      });
+      setCustomers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOpenDialog = (customer = null) => {
     if (customer) {
@@ -94,45 +106,55 @@ const Customers = () => {
     setCurrentCustomer({ ...currentCustomer, [name]: value });
   };
 
-  const handleSaveCustomer = () => {
-    // In a real app, we would call an API service
-    if (currentCustomer.id) {
-      // Update existing customer
-      const updatedCustomers = customers.map(c => 
-        c.id === currentCustomer.id ? currentCustomer : c
-      );
-      setCustomers(updatedCustomers);
+  const handleSaveCustomer = async () => {
+    try {
+      if (currentCustomer.id) {
+        // Update existing customer
+        await updateCustomer(currentCustomer.id, currentCustomer);
+        setSnackbar({
+          open: true,
+          message: 'Customer updated successfully',
+          severity: 'success'
+        });
+      } else {
+        // Create new customer
+        await createCustomer(currentCustomer);
+        setSnackbar({
+          open: true,
+          message: 'Customer created successfully',
+          severity: 'success'
+        });
+      }
+      handleCloseDialog();
+      fetchCustomers(); // Refresh the customer list
+    } catch (error) {
+      console.error('Error saving customer:', error);
       setSnackbar({
         open: true,
-        message: 'Customer updated successfully',
-        severity: 'success'
-      });
-    } else {
-      // Create new customer
-      const newCustomer = {
-        ...currentCustomer,
-        id: Math.max(...customers.map(c => c.id), 0) + 1
-      };
-      setCustomers([...customers, newCustomer]);
-      setSnackbar({
-        open: true,
-        message: 'Customer created successfully',
-        severity: 'success'
+        message: 'Failed to save customer: ' + (error.response?.data?.message || error.message),
+        severity: 'error'
       });
     }
-    handleCloseDialog();
   };
 
-  const handleDeleteCustomer = () => {
-    // In a real app, we would call an API service
-    const filteredCustomers = customers.filter(c => c.id !== currentCustomer.id);
-    setCustomers(filteredCustomers);
-    handleCloseDeleteDialog();
-    setSnackbar({
-      open: true,
-      message: 'Customer deleted successfully',
-      severity: 'success'
-    });
+  const handleDeleteCustomer = async () => {
+    try {
+      await deleteCustomer(currentCustomer.id);
+      handleCloseDeleteDialog();
+      setSnackbar({
+        open: true,
+        message: 'Customer deleted successfully',
+        severity: 'success'
+      });
+      fetchCustomers(); // Refresh the customer list
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete customer: ' + (error.response?.data?.message || error.message),
+        severity: 'error'
+      });
+    }
   };
 
   const handleCloseSnackbar = () => {

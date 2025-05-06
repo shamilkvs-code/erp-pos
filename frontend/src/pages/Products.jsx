@@ -22,7 +22,8 @@ import {
   MenuItem,
   Snackbar,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Chip
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -30,7 +31,7 @@ import {
   ToggleOff as DisableIcon,
   ToggleOn as EnableIcon
 } from '@mui/icons-material';
-import ProductService from '../services/ProductService';
+import { getAllProducts, getProductById, createProduct, updateProduct, getAllCategories } from '../services/api';
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -56,31 +57,42 @@ const Products = () => {
 
   useEffect(() => {
     fetchProducts();
-    // In a real app, we would fetch categories from an API
-    setCategories([
-      { id: 1, name: 'Electronics' },
-      { id: 2, name: 'Clothing' },
-      { id: 3, name: 'Food & Beverages' },
-      { id: 4, name: 'Home & Garden' }
-    ]);
+    fetchCategories();
   }, []);
 
-  const fetchProducts = () => {
-    setLoading(true);
-    ProductService.getAllProducts()
-      .then(response => {
-        setProducts(response.data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error('Error fetching products:', error);
-        setSnackbar({
-          open: true,
-          message: 'Failed to load products',
-          severity: 'error'
-        });
-        setLoading(false);
+  const fetchCategories = async () => {
+    try {
+      // Fetch categories from the API
+      const data = await getAllCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to load categories: ' + (error.response?.data?.message || error.message),
+        severity: 'warning'
       });
+      setCategories([]);
+    }
+  };
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      // Fetch products from the API
+      const data = await getAllProducts();
+      setProducts(data);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to load products: ' + (error.response?.data?.message || error.message),
+        severity: 'error'
+      });
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOpenDialog = (product = null) => {
@@ -138,7 +150,7 @@ const Products = () => {
 
     if (currentProduct.id) {
       // Update existing product
-      ProductService.updateProduct(currentProduct.id, productData)
+      updateProduct(currentProduct.id, productData)
         .then(() => {
           fetchProducts();
           handleCloseDialog();
@@ -152,13 +164,13 @@ const Products = () => {
           console.error('Error updating product:', error);
           setSnackbar({
             open: true,
-            message: 'Failed to update product',
+            message: 'Failed to update product: ' + (error.response?.data?.message || error.message),
             severity: 'error'
           });
         });
     } else {
       // Create new product
-      ProductService.createProduct(productData)
+      createProduct(productData)
         .then(() => {
           fetchProducts();
           handleCloseDialog();
@@ -172,7 +184,7 @@ const Products = () => {
           console.error('Error creating product:', error);
           setSnackbar({
             open: true,
-            message: 'Failed to create product',
+            message: 'Failed to create product: ' + (error.response?.data?.message || error.message),
             severity: 'error'
           });
         });
@@ -181,17 +193,21 @@ const Products = () => {
 
   const handleToggleProductStatus = () => {
     const isDisabling = currentProduct.active;
-    const action = isDisabling ?
-      ProductService.disableProduct(currentProduct.id) :
-      ProductService.enableProduct(currentProduct.id);
 
-    action
-      .then((response) => {
+    // For now, we'll just update the product with the new status
+    // since we don't have specific enable/disable endpoints
+    const updatedProduct = {
+      ...currentProduct,
+      active: !currentProduct.active
+    };
+
+    updateProduct(currentProduct.id, updatedProduct)
+      .then(() => {
         fetchProducts();
         handleCloseDisableDialog();
         setSnackbar({
           open: true,
-          message: response.data.message,
+          message: `Product ${isDisabling ? 'disabled' : 'enabled'} successfully`,
           severity: 'success'
         });
       })
@@ -199,7 +215,7 @@ const Products = () => {
         console.error(`Error ${isDisabling ? 'disabling' : 'enabling'} product:`, error);
         setSnackbar({
           open: true,
-          message: `Failed to ${isDisabling ? 'disable' : 'enable'} product`,
+          message: `Failed to ${isDisabling ? 'disable' : 'enable'} product: ${error.response?.data?.message || error.message}`,
           severity: 'error'
         });
       });

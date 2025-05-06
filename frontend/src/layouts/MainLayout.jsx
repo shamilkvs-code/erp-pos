@@ -23,6 +23,7 @@ import {
   People as PeopleIcon,
   ShoppingCart as ShoppingCartIcon,
   Logout as LogoutIcon,
+  TableRestaurant as TableIcon,
 } from '@mui/icons-material';
 import AuthService from '../services/AuthService';
 
@@ -47,6 +48,7 @@ const MainLayout = () => {
     { text: 'Products', icon: <InventoryIcon />, path: '/dashboard/products' },
     { text: 'Customers', icon: <PeopleIcon />, path: '/dashboard/customers' },
     { text: 'Orders', icon: <ShoppingCartIcon />, path: '/dashboard/orders' },
+    { text: 'Tables', icon: <TableIcon />, path: '/dashboard/tables' },
   ];
 
   const drawer = (
