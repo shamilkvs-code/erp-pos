@@ -179,10 +179,10 @@ export const register = async (username, email, password, fullName, roles) => {
 };
 
 // Products API
-export const getAllProducts = async () => {
+export const getAllProducts = async (signal) => {
   try {
     console.log('Fetching products from:', `${API_URL}/products`);
-    const response = await axios.get(`${API_URL}/products`);
+    const response = await axios.get(`${API_URL}/products`, { signal });
     console.log('Products API response:', response);
 
     if (response.data) {
@@ -197,6 +197,12 @@ export const getAllProducts = async () => {
 
     return response.data;
   } catch (error) {
+    // If the request was aborted, propagate the abort error
+    if (error.name === 'AbortError' || error.name === 'CanceledError') {
+      console.log('Products request was aborted');
+      throw error;
+    }
+
     console.error('Error fetching products:', error);
     console.error('Error details:', {
       status: error.response?.status,
@@ -245,10 +251,10 @@ export const deleteProduct = async (id) => {
 };
 
 // Categories API
-export const getAllCategories = async () => {
+export const getAllCategories = async (signal) => {
   try {
     console.log('Fetching categories from:', `${API_URL}/categories`);
-    const response = await axios.get(`${API_URL}/categories`);
+    const response = await axios.get(`${API_URL}/categories`, { signal });
     console.log('Categories API response:', response);
 
     if (response.data) {
@@ -263,6 +269,12 @@ export const getAllCategories = async () => {
 
     return response.data;
   } catch (error) {
+    // If the request was aborted, propagate the abort error
+    if (error.name === 'AbortError' || error.name === 'CanceledError') {
+      console.log('Categories request was aborted');
+      throw error;
+    }
+
     console.error('Error fetching categories:', error);
     console.error('Error details:', {
       status: error.response?.status,
@@ -334,9 +346,12 @@ export const createOrder = async (order) => {
 
 export const updateOrder = async (id, order) => {
   try {
+    console.log(`Updating order ${id} with data:`, order);
     const response = await axios.put(`${API_URL}/orders/${id}`, order);
+    console.log('Order update response:', response.data);
     return response.data;
   } catch (error) {
+    console.error('Error in updateOrder:', error.response?.data || error.message);
     throw error;
   }
 };
@@ -382,6 +397,18 @@ export const createTableOrder = async (tableId, order) => {
     const response = await axios.post(`${API_URL}/orders/table/${tableId}`, order);
     return response.data;
   } catch (error) {
+    throw error;
+  }
+};
+
+export const addItemToOrder = async (orderId, item) => {
+  try {
+    console.log(`Adding item to order ${orderId}:`, item);
+    const response = await axios.post(`${API_URL}/orders/${orderId}/items`, item);
+    console.log('Add item response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error in addItemToOrder:', error.response?.data || error.message);
     throw error;
   }
 };
@@ -482,20 +509,110 @@ export const deleteCustomer = async (id) => {
 };
 
 // Dashboard API
-export const getDashboardStats = async () => {
+export const getDashboardStats = async (signal) => {
   try {
-    const response = await axios.get(`${API_URL}/dashboard/stats`);
+    console.log('Fetching dashboard stats from:', `${API_URL}/dashboard/stats`);
+
+    // Get the token from localStorage
+    const userStr = localStorage.getItem('user');
+    let token = null;
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        token = user.token;
+      } catch (e) {
+        console.error('Error parsing user from localStorage:', e);
+      }
+    }
+
+    // If no token in user object, try fallback
+    if (!token) {
+      token = localStorage.getItem('token');
+    }
+
+    // Log token status
+    console.log('Token status for dashboard stats request:', token ? 'Token exists' : 'No token');
+
+    // Make the request with explicit headers and abort signal if provided
+    const response = await axios.get(`${API_URL}/dashboard/stats`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      signal: signal // Pass the abort signal to axios
+    });
+
+    console.log('Dashboard stats response:', response.data);
     return response.data;
   } catch (error) {
+    // If the request was aborted, propagate the abort error
+    if (error.name === 'AbortError' || error.name === 'CanceledError') {
+      console.log('Dashboard stats request was aborted');
+      throw error;
+    }
+
+    console.error('Error fetching dashboard stats:', error);
+    console.error('Error details:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
     throw error;
   }
 };
 
-export const getRecentOrders = async () => {
+export const getRecentOrders = async (signal) => {
   try {
-    const response = await axios.get(`${API_URL}/dashboard/recent-orders`);
+    console.log('Fetching recent orders from:', `${API_URL}/dashboard/recent-orders`);
+
+    // Get the token from localStorage
+    const userStr = localStorage.getItem('user');
+    let token = null;
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        token = user.token;
+      } catch (e) {
+        console.error('Error parsing user from localStorage:', e);
+      }
+    }
+
+    // If no token in user object, try fallback
+    if (!token) {
+      token = localStorage.getItem('token');
+    }
+
+    // Log token status
+    console.log('Token status for recent orders request:', token ? 'Token exists' : 'No token');
+
+    // Make the request with explicit headers and abort signal if provided
+    const response = await axios.get(`${API_URL}/dashboard/recent-orders`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      signal: signal // Pass the abort signal to axios
+    });
+
+    console.log('Recent orders response:', response.data);
     return response.data;
   } catch (error) {
+    // If the request was aborted, propagate the abort error
+    if (error.name === 'AbortError' || error.name === 'CanceledError') {
+      console.log('Recent orders request was aborted');
+      throw error;
+    }
+
+    console.error('Error fetching recent orders:', error);
+    console.error('Error details:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
     throw error;
   }
 };
@@ -552,24 +669,136 @@ export const hasRole = (role) => {
 };
 
 // Tables API
-export const getAllTables = async () => {
+export const getAllTables = async (signal) => {
   try {
-    const response = await axios.get(`${API_URL}/tables`);
-    return response.data;
+    console.log('Fetching tables from:', `${API_URL}/tables`);
+
+    // Get the token from localStorage
+    const userStr = localStorage.getItem('user');
+    let token = null;
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        token = user.token;
+      } catch (e) {
+        console.error('Error parsing user from localStorage:', e);
+      }
+    }
+
+    // If no token in user object, try fallback
+    if (!token) {
+      token = localStorage.getItem('token');
+    }
+
+    // Log token status
+    console.log('Token status for tables request:', token ? 'Token exists' : 'No token');
+
+    // Make the request with explicit headers and abort signal if provided
+    const response = await axios.get(`${API_URL}/tables`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      signal: signal // Pass the abort signal to axios
+    });
+
+    console.log('Tables API response:', response);
+
+    // Check if response.data is an array
+    if (response.data) {
+      if (Array.isArray(response.data)) {
+        console.log('Tables data is an array with length:', response.data.length);
+        return response.data;
+      } else {
+        console.warn('Tables data is not an array:', response.data);
+        // If it's not an array but has a tables property that is an array, return that
+        if (response.data.tables && Array.isArray(response.data.tables)) {
+          console.log('Using tables property which is an array with length:', response.data.tables.length);
+          return response.data.tables;
+        } else {
+          // If all else fails, return an empty array to prevent errors
+          console.error('Could not find valid tables data, returning empty array');
+          return [];
+        }
+      }
+    } else {
+      console.error('No data in response, returning empty array');
+      return [];
+    }
   } catch (error) {
-    throw error;
+    // If the request was aborted, propagate the abort error
+    if (error.name === 'AbortError' || error.name === 'CanceledError') {
+      console.log('Tables request was aborted');
+      throw error;
+    }
+
+    console.error('Error fetching tables:', error);
+    console.error('Error details:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
+
+    // Return empty array instead of throwing to prevent UI errors
+    console.log('Returning empty array due to error');
+    return [];
   }
 };
 
-export const getTableById = async (id) => {
+export const getTableById = async (id, signal) => {
   console.log('API: getTableById called with id:', id);
   try {
     console.log(`API: Making GET request to ${API_URL}/tables/${id}`);
-    const response = await axios.get(`${API_URL}/tables/${id}`);
+
+    // Get the token from localStorage
+    const userStr = localStorage.getItem('user');
+    let token = null;
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        token = user.token;
+      } catch (e) {
+        console.error('Error parsing user from localStorage:', e);
+      }
+    }
+
+    // If no token in user object, try fallback
+    if (!token) {
+      token = localStorage.getItem('token');
+    }
+
+    // Log token status
+    console.log('Token status for getTableById request:', token ? 'Token exists' : 'No token');
+
+    // Make the request with explicit headers and abort signal if provided
+    const response = await axios.get(`${API_URL}/tables/${id}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      signal: signal // Pass the abort signal to axios
+    });
+
     console.log('API: getTableById response:', response.data);
     return response.data;
   } catch (error) {
+    // If the request was aborted, propagate the abort error
+    if (error.name === 'AbortError' || error.name === 'CanceledError') {
+      console.log(`Table ${id} request was aborted`);
+      throw error;
+    }
+
     console.error('API: Error in getTableById:', error);
+    console.error('Error details:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
+
     // Return sample table data if API fails
     const sampleTable = {
       id: parseInt(id),
@@ -735,6 +964,7 @@ export default {
   getOrdersByTable,
   getCurrentTableOrder,
   createTableOrder,
+  addItemToOrder,
   completeAndClearTable,
   getAllTables,
   getTableById,

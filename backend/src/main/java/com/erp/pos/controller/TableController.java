@@ -1,5 +1,6 @@
 package com.erp.pos.controller;
 
+import com.erp.pos.dto.TableDTO;
 import com.erp.pos.model.Order;
 import com.erp.pos.model.RestaurantTable;
 import com.erp.pos.service.OrderService;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/tables")
@@ -29,27 +31,29 @@ public class TableController {
      * Get all tables
      */
     @GetMapping
-    public ResponseEntity<List<RestaurantTable>> getAllTables() {
+    public List<TableDTO> getAllTables() {
         List<RestaurantTable> tables = tableService.getAllTables();
-        return new ResponseEntity<>(tables, HttpStatus.OK);
+        return tables.stream()
+                .map(TableDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 
     /**
      * Get table by ID
      */
     @GetMapping("/{id}")
-    public ResponseEntity<RestaurantTable> getTableById(@PathVariable Long id) {
+    public TableDTO getTableById(@PathVariable Long id) {
         RestaurantTable table = tableService.getTableById(id);
-        return new ResponseEntity<>(table, HttpStatus.OK);
+        return TableDTO.fromEntity(table);
     }
 
     /**
      * Get table by table number
      */
     @GetMapping("/number/{tableNumber}")
-    public ResponseEntity<RestaurantTable> getTableByNumber(@PathVariable String tableNumber) {
+    public ResponseEntity<TableDTO> getTableByNumber(@PathVariable String tableNumber) {
         Optional<RestaurantTable> table = tableService.getTableByNumber(tableNumber);
-        return table.map(value -> new ResponseEntity<>(value, HttpStatus.OK))
+        return table.map(value -> new ResponseEntity<>(TableDTO.fromEntity(value), HttpStatus.OK))
                 .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
@@ -57,11 +61,14 @@ public class TableController {
      * Get tables by status
      */
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<RestaurantTable>> getTablesByStatus(@PathVariable String status) {
+    public ResponseEntity<List<TableDTO>> getTablesByStatus(@PathVariable String status) {
         try {
             RestaurantTable.TableStatus tableStatus = RestaurantTable.TableStatus.valueOf(status.toUpperCase());
             List<RestaurantTable> tables = tableService.getTablesByStatus(tableStatus);
-            return new ResponseEntity<>(tables, HttpStatus.OK);
+            List<TableDTO> tableDTOs = tables.stream()
+                    .map(TableDTO::fromEntity)
+                    .collect(Collectors.toList());
+            return new ResponseEntity<>(tableDTOs, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
@@ -71,18 +78,22 @@ public class TableController {
      * Get tables by location
      */
     @GetMapping("/location/{location}")
-    public ResponseEntity<List<RestaurantTable>> getTablesByLocation(@PathVariable String location) {
+    public List<TableDTO> getTablesByLocation(@PathVariable String location) {
         List<RestaurantTable> tables = tableService.getTablesByLocation(location);
-        return new ResponseEntity<>(tables, HttpStatus.OK);
+        return tables.stream()
+                .map(TableDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 
     /**
      * Get tables by minimum capacity
      */
     @GetMapping("/capacity/{capacity}")
-    public ResponseEntity<List<RestaurantTable>> getTablesByMinCapacity(@PathVariable Integer capacity) {
+    public List<TableDTO> getTablesByMinCapacity(@PathVariable Integer capacity) {
         List<RestaurantTable> tables = tableService.getTablesByMinCapacity(capacity);
-        return new ResponseEntity<>(tables, HttpStatus.OK);
+        return tables.stream()
+                .map(TableDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -90,9 +101,10 @@ public class TableController {
      */
     @PostMapping
     @PreAuthorize("hasRole('MANAGER') or hasRole('ADMIN')")
-    public ResponseEntity<RestaurantTable> createTable(@Valid @RequestBody RestaurantTable table) {
+    @ResponseStatus(HttpStatus.CREATED)
+    public TableDTO createTable(@Valid @RequestBody RestaurantTable table) {
         RestaurantTable createdTable = tableService.createTable(table);
-        return new ResponseEntity<>(createdTable, HttpStatus.CREATED);
+        return TableDTO.fromEntity(createdTable);
     }
 
     /**
@@ -100,9 +112,9 @@ public class TableController {
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER') or hasRole('ADMIN')")
-    public ResponseEntity<RestaurantTable> updateTable(@PathVariable Long id, @Valid @RequestBody RestaurantTable tableDetails) {
+    public TableDTO updateTable(@PathVariable Long id, @Valid @RequestBody RestaurantTable tableDetails) {
         RestaurantTable updatedTable = tableService.updateTable(id, tableDetails);
-        return new ResponseEntity<>(updatedTable, HttpStatus.OK);
+        return TableDTO.fromEntity(updatedTable);
     }
 
     /**
@@ -110,9 +122,9 @@ public class TableController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER') or hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteTable(@PathVariable Long id) {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTable(@PathVariable Long id) {
         tableService.deleteTable(id);
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
     /**
@@ -120,10 +132,10 @@ public class TableController {
      */
     @PostMapping("/{tableId}/orders")
     @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
-    public ResponseEntity<RestaurantTable> assignOrderToTable(@PathVariable Long tableId, @Valid @RequestBody Order order) {
+    public TableDTO assignOrderToTable(@PathVariable Long tableId, @Valid @RequestBody Order order) {
         Order createdOrder = orderService.createOrder(order);
         RestaurantTable updatedTable = tableService.assignOrderToTable(tableId, createdOrder);
-        return new ResponseEntity<>(updatedTable, HttpStatus.OK);
+        return TableDTO.fromEntity(updatedTable);
     }
 
     /**
@@ -149,9 +161,9 @@ public class TableController {
      */
     @PostMapping("/{tableId}/clear")
     @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
-    public ResponseEntity<RestaurantTable> clearTable(@PathVariable Long tableId) {
+    public TableDTO clearTable(@PathVariable Long tableId) {
         RestaurantTable clearedTable = tableService.clearTable(tableId);
-        return new ResponseEntity<>(clearedTable, HttpStatus.OK);
+        return TableDTO.fromEntity(clearedTable);
     }
 
     /**
@@ -159,7 +171,7 @@ public class TableController {
      */
     @PatchMapping("/{tableId}/status")
     @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
-    public ResponseEntity<RestaurantTable> changeTableStatus(@PathVariable Long tableId, @RequestBody Map<String, String> statusUpdate) {
+    public ResponseEntity<TableDTO> changeTableStatus(@PathVariable Long tableId, @RequestBody Map<String, String> statusUpdate) {
         try {
             String status = statusUpdate.get("status");
             if (status == null) {
@@ -168,7 +180,7 @@ public class TableController {
 
             RestaurantTable.TableStatus tableStatus = RestaurantTable.TableStatus.valueOf(status.toUpperCase());
             RestaurantTable updatedTable = tableService.changeTableStatus(tableId, tableStatus);
-            return new ResponseEntity<>(updatedTable, HttpStatus.OK);
+            return new ResponseEntity<>(TableDTO.fromEntity(updatedTable), HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
@@ -179,7 +191,7 @@ public class TableController {
      */
     @PatchMapping("/{tableId}/position")
     @PreAuthorize("hasRole('MANAGER') or hasRole('ADMIN')")
-    public ResponseEntity<RestaurantTable> updateTablePosition(
+    public TableDTO updateTablePosition(
             @PathVariable Long tableId,
             @RequestBody Map<String, Object> positionUpdate) {
 
@@ -206,15 +218,17 @@ public class TableController {
         }
 
         RestaurantTable updatedTable = tableService.updateTable(tableId, table);
-        return new ResponseEntity<>(updatedTable, HttpStatus.OK);
+        return TableDTO.fromEntity(updatedTable);
     }
 
     /**
      * Get floor plan (all tables with position information)
      */
     @GetMapping("/floor-plan")
-    public ResponseEntity<List<RestaurantTable>> getFloorPlan() {
+    public List<TableDTO> getFloorPlan() {
         List<RestaurantTable> tables = tableService.getAllTables();
-        return new ResponseEntity<>(tables, HttpStatus.OK);
+        return tables.stream()
+                .map(TableDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 }

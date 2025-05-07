@@ -77,39 +77,64 @@ const Tables = () => {
   const [locationFilter, setLocationFilter] = useState('ALL');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'floor'
 
-  useEffect(() => {
-    fetchTables();
-  }, [statusFilter, locationFilter]);
+  const [dataFetched, setDataFetched] = useState(false);
+  const [forceRefresh, setForceRefresh] = useState(0);
 
+  // Define a fetchTables function that can be called from anywhere in the component
   const fetchTables = async () => {
-    setLoading(true);
-    try {
-      // Fetch tables from the API
-      let data = await getAllTables();
-
-      // Apply status filter
-      if (statusFilter !== 'ALL') {
-        data = data.filter(table => table.status === statusFilter);
-      }
-
-      // Apply location filter (only for grid view, floor plan handles this internally)
-      if (locationFilter !== 'ALL' && viewMode === 'grid') {
-        data = data.filter(table => table.location === locationFilter);
-      }
-
-      setTables(data);
-    } catch (error) {
-      console.error('Error fetching tables:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to load tables: ' + (error.response?.data?.message || error.message),
-        severity: 'error'
-      });
-      setTables([]);
-    } finally {
-      setLoading(false);
-    }
+    // Force a refresh by incrementing the forceRefresh counter
+    setForceRefresh(prev => prev + 1);
   };
+
+  useEffect(() => {
+    // Create an AbortController to cancel requests when component unmounts
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    async function loadTables() {
+      setLoading(true);
+      try {
+        // Fetch tables from the API with the abort signal
+        let data = await getAllTables(signal);
+
+        // Apply status filter
+        if (statusFilter !== 'ALL') {
+          data = data.filter(table => table.status === statusFilter);
+        }
+
+        // Apply location filter (only for grid view, floor plan handles this internally)
+        if (locationFilter !== 'ALL' && viewMode === 'grid') {
+          data = data.filter(table => table.location === locationFilter);
+        }
+
+        setTables(data);
+        setDataFetched(true);
+      } catch (error) {
+        // If the request was aborted, don't update state
+        if (error.name === 'AbortError' || error.name === 'CanceledError') {
+          console.log('Tables fetch aborted');
+          return;
+        }
+
+        console.error('Error fetching tables:', error);
+        setSnackbar({
+          open: true,
+          message: 'Failed to load tables: ' + (error.response?.data?.message || error.message),
+          severity: 'error'
+        });
+        setTables([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadTables();
+
+    // Cleanup function to abort any in-flight requests when the component unmounts
+    return () => {
+      controller.abort();
+    };
+  }, [statusFilter, locationFilter, viewMode, forceRefresh]);
 
   const handleOpenDialog = (table = null) => {
     if (table) {
@@ -188,7 +213,7 @@ const Tables = () => {
         });
       }
       handleCloseDialog();
-      fetchTables();
+      fetchTables(); // Use the fetchTables function we defined
     } catch (error) {
       console.error('Error saving table:', error);
       setSnackbar({
