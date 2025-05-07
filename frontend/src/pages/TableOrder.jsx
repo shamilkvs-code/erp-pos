@@ -75,13 +75,23 @@ const TableOrder = () => {
       setTable(tableData);
 
       // Get current order for this table if it's occupied
-      if (tableData.status === 'OCCUPIED') {
+      if (tableData.status === 'OCCUPIED' && tableData.currentOrder) {
         try {
-          const orderData = await getCurrentTableOrder(tableId);
+          // Use the current order from the table data
+          const orderData = tableData.currentOrder;
+
+          // Initialize items array if it doesn't exist
+          if (!orderData.orderItems) {
+            orderData.orderItems = [];
+          }
+
+          // Rename orderItems to items for compatibility with the UI
+          orderData.items = orderData.orderItems;
+
           setOrder(orderData);
         } catch (orderError) {
-          console.error('Error fetching order:', orderError);
-          // If there's no current order, just set it to null
+          console.error('Error processing order:', orderError);
+          // If there's an error, just set it to null
           setOrder(null);
         }
       } else {
@@ -161,10 +171,14 @@ const TableOrder = () => {
         notes: currentItem.notes
       };
 
+      // Update both items and orderItems arrays
+      const updatedItems = [...(order.items || []), newItem];
+
       setOrder({
         ...order,
-        items: [...(order.items || []), newItem],
-        totalAmount: (order.totalAmount || 0) + newItem.subtotal
+        items: updatedItems,
+        orderItems: updatedItems,
+        totalAmount: (parseFloat(order.totalAmount) || 0) + newItem.subtotal
       });
 
       setSnackbar({
@@ -192,10 +206,14 @@ const TableOrder = () => {
         throw new Error('Item not found');
       }
 
+      // Filter out the item from both arrays
+      const updatedItems = order.items.filter(i => i.id !== itemId);
+
       setOrder({
         ...order,
-        items: order.items.filter(i => i.id !== itemId),
-        totalAmount: order.totalAmount - item.subtotal
+        items: updatedItems,
+        orderItems: updatedItems,
+        totalAmount: parseFloat(order.totalAmount) - item.subtotal
       });
 
       setSnackbar({

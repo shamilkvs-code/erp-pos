@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { PRODUCTS_API_URL } from '../config/api.config';
+import { PRODUCTS_API_URL, AUTH_API_URL } from '../config/api.config';
 
 const API_URL = PRODUCTS_API_URL;
 
@@ -20,13 +20,49 @@ axios.interceptors.request.use(
 // Authentication API
 export const login = async (username, password) => {
   try {
-    const response = await axios.post(`${API_URL}/auth/signin`, { username, password });
+    console.log('Attempting login with:', { username, password });
+
+    const response = await axios.post(`${AUTH_API_URL}/signin`, { username, password });
+    console.log('Login response:', response.data);
+
     if (response.data.token) {
+      // Store the token and user in localStorage
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data));
     }
     return response.data;
   } catch (error) {
+    console.error('Login error:', error);
+    if (error.response) {
+      console.error('Error response:', error.response.data);
+      console.error('Status:', error.response.status);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    } else {
+      console.error('Error setting up request:', error.message);
+    }
+    throw error;
+  }
+};
+
+export const signup = async (userData) => {
+  try {
+    console.log('Attempting signup with:', userData);
+
+    const response = await axios.post(`${AUTH_API_URL}/signup`, userData);
+    console.log('Signup response:', response.data);
+
+    return response.data;
+  } catch (error) {
+    console.error('Signup error:', error);
+    if (error.response) {
+      console.error('Error response:', error.response.data);
+      console.error('Status:', error.response.status);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    } else {
+      console.error('Error setting up request:', error.message);
+    }
     throw error;
   }
 };
@@ -37,13 +73,18 @@ export const logout = () => {
 };
 
 export const register = async (username, email, password, fullName, roles) => {
-  return axios.post(`${API_URL}/auth/signup`, {
-    username,
-    email,
-    password,
-    fullName,
-    roles,
-  });
+  try {
+    const response = await axios.post(`${AUTH_API_URL}/signup`, {
+      username,
+      email,
+      password,
+      fullName,
+      roles,
+    });
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
 };
 
 // Products API
@@ -402,9 +443,27 @@ export const assignOrderToTable = async (tableId, orderId) => {
 
 export const createOrderForTable = async (tableId, order) => {
   try {
-    const response = await axios.post(`${API_URL}/tables/${tableId}/create-order`, order);
+    console.log(`Creating order for table ${tableId} with data:`, order);
+
+    // Make sure all required fields are present
+    const orderData = {
+      ...order,
+      orderDate: order.orderDate || new Date().toISOString(),
+      totalAmount: order.totalAmount || 0.00,
+      status: order.status || 'PENDING',
+      orderItems: order.orderItems || []
+    };
+
+    // Convert totalAmount to string with 2 decimal places
+    if (typeof orderData.totalAmount === 'number') {
+      orderData.totalAmount = orderData.totalAmount.toFixed(2);
+    }
+
+    const response = await axios.post(`${API_URL}/orders/table/${tableId}`, orderData);
+    console.log('Order creation response:', response.data);
     return response.data;
   } catch (error) {
+    console.error('Error in createOrderForTable:', error.response?.data || error.message);
     throw error;
   }
 };

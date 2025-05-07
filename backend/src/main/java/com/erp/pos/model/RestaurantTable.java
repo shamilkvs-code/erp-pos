@@ -1,5 +1,6 @@
 package com.erp.pos.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -29,6 +30,7 @@ public class RestaurantTable extends BaseEntity {
 
     @ManyToOne
     @JoinColumn(name = "current_order_id")
+    @JsonIgnoreProperties("table")
     private Order currentOrder;
 
     private String location; // e.g., "MAIN", "OUTDOOR", "PRIVATE", "BAR", etc.

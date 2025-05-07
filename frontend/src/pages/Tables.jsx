@@ -199,6 +199,7 @@ const Tables = () => {
 
   const handleCreateOrder = async () => {
     try {
+      // The API service will handle adding the required fields
       await createOrderForTable(currentTable.id, currentOrder);
       setSnackbar({
         open: true,
@@ -306,7 +307,7 @@ const Tables = () => {
         return 'error';
       case 'RESERVED':
         return 'warning';
-      case 'MAINTENANCE':
+      case 'CLEANING':
         return 'info';
       default:
         return 'default';
@@ -360,7 +361,7 @@ const Tables = () => {
                 <MenuItem value="AVAILABLE">Available</MenuItem>
                 <MenuItem value="OCCUPIED">Occupied</MenuItem>
                 <MenuItem value="RESERVED">Reserved</MenuItem>
-                <MenuItem value="MAINTENANCE">Maintenance</MenuItem>
+                <MenuItem value="CLEANING">Cleaning</MenuItem>
               </Select>
             </FormControl>
 
@@ -507,18 +508,18 @@ const Tables = () => {
                               </IconButton>
                             </Tooltip>
                           )}
-                          {table.status !== 'MAINTENANCE' && (
-                            <Tooltip title="Set to Maintenance">
+                          {table.status !== 'CLEANING' && (
+                            <Tooltip title="Set to Cleaning">
                               <IconButton
                                 size="small"
-                                onClick={() => handleChangeStatus(table.id, 'MAINTENANCE')}
+                                onClick={() => handleChangeStatus(table.id, 'CLEANING')}
                                 color="info"
                               >
                                 <RestaurantIcon />
                               </IconButton>
                             </Tooltip>
                           )}
-                          {table.status === 'MAINTENANCE' && (
+                          {table.status === 'CLEANING' && (
                             <Tooltip title="Set to Available">
                               <IconButton
                                 size="small"
@@ -598,7 +599,7 @@ const Tables = () => {
               <MenuItem value="AVAILABLE">Available</MenuItem>
               <MenuItem value="OCCUPIED">Occupied</MenuItem>
               <MenuItem value="RESERVED">Reserved</MenuItem>
-              <MenuItem value="MAINTENANCE">Maintenance</MenuItem>
+              <MenuItem value="CLEANING">Cleaning</MenuItem>
             </Select>
           </FormControl>
           <FormControl fullWidth margin="dense">

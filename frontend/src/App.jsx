@@ -11,6 +11,7 @@ import AuthLayout from './layouts/AuthLayout';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import SignupPage from './pages/SignupPage';
 import Products from './pages/Products';
 import Customers from './pages/Customers';
 import Orders from './pages/Orders';
@@ -51,6 +52,7 @@ function App() {
           <Route path="/" element={<AuthLayout />}>
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
+            <Route path="signup" element={<SignupPage />} />
             <Route index element={<Navigate to="/login" />} />
           </Route>
 

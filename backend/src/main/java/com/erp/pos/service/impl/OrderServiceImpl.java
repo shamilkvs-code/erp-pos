@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -92,6 +93,11 @@ public class OrderServiceImpl implements OrderService {
                 // Default to takeout if no table is specified
                 order.setOrderType(Order.OrderType.TAKEOUT);
             }
+        }
+
+        // Set default total amount if not provided
+        if (order.getTotalAmount() == null) {
+            order.setTotalAmount(new BigDecimal("0.00"));
         }
 
         // Save the order first to get an ID

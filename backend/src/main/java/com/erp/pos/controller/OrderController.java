@@ -218,9 +218,12 @@ public class OrderController {
         order.setOrderType(Order.OrderType.DINE_IN);
 
         // Set the current user as the creator of the order
-        User currentUser = new User();
-        currentUser.setId(1L); // This should be replaced with actual user ID from authentication
-        order.setCreatedBy(currentUser);
+        if (userDetails != null) {
+            User currentUser = new User();
+            currentUser.setUsername(userDetails.getUsername());
+            currentUser.setId(1L); // This is a simplification - in a real app, you'd look up the user ID
+            order.setCreatedBy(currentUser);
+        }
 
         // Create the order
         Order createdOrder = orderService.createOrder(order);

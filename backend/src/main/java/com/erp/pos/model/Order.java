@@ -1,5 +1,6 @@
 package com.erp.pos.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -36,6 +37,7 @@ public class Order extends BaseEntity {
 
     @ManyToOne
     @JoinColumn(name = "table_id")
+    @JsonIgnoreProperties("currentOrder")
     private RestaurantTable table;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
