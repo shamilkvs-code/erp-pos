@@ -6,10 +6,28 @@ const API_URL = PRODUCTS_API_URL;
 // Add a request interceptor to add the auth token to every request
 axios.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    // Try to get the token from user object first (preferred method)
+    const userStr = localStorage.getItem('user');
+    let token = null;
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        token = user.token;
+      } catch (e) {
+        console.error('Error parsing user from localStorage:', e);
+      }
+    }
+
+    // Fallback to direct token storage if user object doesn't exist or doesn't have token
+    if (!token) {
+      token = localStorage.getItem('token');
+    }
+
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+
     return config;
   },
   (error) => {
@@ -20,15 +38,20 @@ axios.interceptors.request.use(
 // Authentication API
 export const login = async (username, password) => {
   try {
-    console.log('Attempting login with:', { username, password });
+    console.log('Attempting login with:', { username });
 
     const response = await axios.post(`${AUTH_API_URL}/signin`, { username, password });
-    console.log('Login response:', response.data);
+    console.log('Login response received');
 
-    if (response.data.token) {
-      // Store the token and user in localStorage
-      localStorage.setItem('token', response.data.token);
+    if (response.data && response.data.token) {
+      // Store only in the user object for consistency
       localStorage.setItem('user', JSON.stringify(response.data));
+
+      // Log successful login
+      console.log('Login successful, token stored in localStorage');
+    } else {
+      console.error('Login response missing token:', response.data);
+      throw new Error('Invalid login response: missing token');
     }
     return response.data;
   } catch (error) {
@@ -68,8 +91,12 @@ export const signup = async (userData) => {
 };
 
 export const logout = () => {
+  // Remove both for backward compatibility
   localStorage.removeItem('token');
   localStorage.removeItem('user');
+
+  // Log logout
+  console.log('User logged out, localStorage cleared');
 };
 
 export const register = async (username, email, password, fullName, roles) => {
@@ -329,6 +356,20 @@ export const getRecentOrders = async () => {
 
 // Helper function to check if user is authenticated
 export const isAuthenticated = () => {
+  // First check for user object with token
+  const userStr = localStorage.getItem('user');
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      if (user && user.token) {
+        return true;
+      }
+    } catch (e) {
+      console.error('Error parsing user from localStorage:', e);
+    }
+  }
+
+  // Fallback to direct token check for backward compatibility
   return localStorage.getItem('token') !== null;
 };
 
@@ -336,7 +377,21 @@ export const isAuthenticated = () => {
 export const getCurrentUser = () => {
   const userStr = localStorage.getItem('user');
   if (userStr) {
-    return JSON.parse(userStr);
+    try {
+      const user = JSON.parse(userStr);
+      // Validate that the user object has the expected properties
+      if (user && user.token && user.username) {
+        return user;
+      } else {
+        console.warn('Invalid user object in localStorage:', user);
+        // Clear invalid user data
+        localStorage.removeItem('user');
+      }
+    } catch (e) {
+      console.error('Error parsing user from localStorage:', e);
+      // Clear invalid user data
+      localStorage.removeItem('user');
+    }
   }
   return null;
 };

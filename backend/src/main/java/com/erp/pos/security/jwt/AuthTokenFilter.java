@@ -30,9 +30,15 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         try {
+            // Log the request URL for debugging
+            logger.debug("Processing request: {} {}", request.getMethod(), request.getRequestURI());
+
             String jwt = parseJwt(request);
+            logger.debug("JWT token extracted: {}", jwt != null ? "present" : "null");
+
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
                 String username = jwtUtils.getUserNameFromJwtToken(jwt);
+                logger.debug("Username from JWT: {}", username);
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 UsernamePasswordAuthenticationToken authentication =
@@ -43,9 +49,15 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+                logger.debug("User authenticated successfully: {}", username);
+            } else if (jwt != null) {
+                logger.warn("JWT token validation failed");
             }
         } catch (Exception e) {
             logger.error("Cannot set user authentication: {}", e.getMessage());
+            if (logger.isDebugEnabled()) {
+                e.printStackTrace();
+            }
         }
 
         filterChain.doFilter(request, response);
@@ -56,6 +68,13 @@ public class AuthTokenFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
             return headerAuth.substring(7);
+        }
+
+        // Check for token in request parameters (for testing purposes)
+        String tokenParam = request.getParameter("token");
+        if (StringUtils.hasText(tokenParam)) {
+            logger.debug("Token found in request parameter");
+            return tokenParam;
         }
 
         return null;

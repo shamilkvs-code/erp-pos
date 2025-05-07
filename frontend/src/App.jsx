@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { Box, CircularProgress } from '@mui/material';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
@@ -80,9 +81,34 @@ function App() {
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-  const user = AuthService.getCurrentUser();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (!user) {
+  useEffect(() => {
+    // Check authentication status
+    const checkAuth = () => {
+      const user = AuthService.getCurrentUser();
+      setIsAuthenticated(!!user);
+      setIsLoading(false);
+
+      if (!user) {
+        console.log('ProtectedRoute: User not authenticated, redirecting to login');
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  if (isLoading) {
+    // Show loading indicator while checking authentication
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
 
