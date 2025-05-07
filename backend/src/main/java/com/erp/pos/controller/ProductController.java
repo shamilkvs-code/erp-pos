@@ -35,18 +35,8 @@ public class ProductController {
             System.out.println("Product: " + product.getName() + ", ID: " + product.getId());
         }
 
-        // Create a simple response with just the product names
-        List<String> productNames = new ArrayList<>();
-        for (Product product : products) {
-            productNames.add(product.getName());
-        }
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("productNames", productNames);
-        response.put("count", products.size());
-        response.put("message", "Products retrieved successfully");
-
-        return ResponseEntity.ok(response);
+        // Return the products directly as a list
+        return ResponseEntity.ok(products);
     }
 
     @GetMapping("/{id}")

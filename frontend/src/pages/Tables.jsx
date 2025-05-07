@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -50,6 +51,7 @@ import {
 import TableFloorPlan from '../components/TableFloorPlan';
 
 const Tables = () => {
+  const navigate = useNavigate();
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
@@ -432,7 +434,14 @@ const Tables = () => {
                       flexDirection: 'column',
                       borderTop: `4px solid ${table.status === 'AVAILABLE' ? '#4caf50' :
                                             table.status === 'OCCUPIED' ? '#f44336' :
-                                            table.status === 'RESERVED' ? '#ff9800' : '#2196f3'}`
+                                            table.status === 'RESERVED' ? '#ff9800' : '#2196f3'}`,
+                      cursor: table.status === 'OCCUPIED' ? 'pointer' : 'default'
+                    }}
+                    onClick={() => {
+                      if (table.status === 'OCCUPIED') {
+                        // Use React Router's navigate for navigation
+                        navigate(`/dashboard/tables/${table.id}/order`);
+                      }
                     }}
                   >
                     <CardContent sx={{ flexGrow: 1 }}>
@@ -547,8 +556,8 @@ const Tables = () => {
                 if (table.status === 'AVAILABLE') {
                   handleOpenOrderDialog(table);
                 } else if (table.status === 'OCCUPIED') {
-                  // Navigate to table order page
-                  window.location.href = `/dashboard/tables/${table.id}/order`;
+                  // Use React Router's navigate for navigation
+                  navigate(`/dashboard/tables/${table.id}/order`);
                 } else {
                   handleOpenDialog(table);
                 }

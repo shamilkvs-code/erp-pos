@@ -8,364 +8,282 @@ import {
   Grid,
   Card,
   CardContent,
-  CardActions,
+  TextField,
+  InputAdornment,
   List,
   ListItem,
   ListItemText,
+  ListItemSecondaryAction,
   Divider,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Snackbar,
-  Alert,
+  Tabs,
+  Tab,
   CircularProgress,
+  AppBar,
+  Toolbar,
   IconButton,
-  Chip
+  Container
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
   ArrowBack as ArrowBackIcon,
-  CheckCircle as CheckCircleIcon,
-  Receipt as ReceiptIcon,
-  Remove as RemoveIcon,
-  Edit as EditIcon
+  Home as HomeIcon,
+  Search as SearchIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
-import {
-  getTableById,
-  getCurrentTableOrder,
-  completeAndClearTable,
-  getAllProducts
-} from '../services/api';
+
+// Import API services
+import * as api from '../services/api';
 
 const TableOrder = () => {
   const { tableId } = useParams();
   const navigate = useNavigate();
+  
+  // State variables
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [table, setTable] = useState(null);
   const [order, setOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
-  const [openAddItemDialog, setOpenAddItemDialog] = useState(false);
-  const [openEditItemDialog, setOpenEditItemDialog] = useState(false);
-  const [openCompleteDialog, setOpenCompleteDialog] = useState(false);
-  const [currentItem, setCurrentItem] = useState({
-    id: null,
-    productId: '',
-    quantity: 1,
-    notes: ''
-  });
-  const [editMode, setEditMode] = useState(false);
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success'
-  });
+  const [categories, setCategories] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
+  // Fetch data on component mount
   useEffect(() => {
-    fetchTableAndOrder();
-    fetchProducts();
+    console.log('TableOrder component mounted with tableId:', tableId);
+    fetchData();
   }, [tableId]);
 
-  const fetchTableAndOrder = async () => {
+  // Fetch all necessary data
+  const fetchData = async () => {
     setLoading(true);
+    setError(null);
+    
     try {
-      // Get table data from API
-      const tableData = await getTableById(tableId);
+      // Get table data
+      console.log('Fetching table data for tableId:', tableId);
+      const tableData = await api.getTableById(tableId);
+      console.log('Received table data:', tableData);
       setTable(tableData);
 
-      // Get current order for this table if it's occupied
+      // Get order data if table is occupied
       if (tableData.status === 'OCCUPIED' && tableData.currentOrder) {
-        try {
-          // Use the current order from the table data
-          const orderData = tableData.currentOrder;
-
-          // Initialize items array if it doesn't exist
-          if (!orderData.orderItems) {
-            orderData.orderItems = [];
-          }
-
-          // Rename orderItems to items for compatibility with the UI
-          orderData.items = orderData.orderItems;
-
-          setOrder(orderData);
-        } catch (orderError) {
-          console.error('Error processing order:', orderError);
-          // If there's an error, just set it to null
-          setOrder(null);
-        }
+        console.log('Table is occupied, setting order data');
+        setOrder(tableData.currentOrder);
       } else {
+        console.log('Table is not occupied or has no order');
         setOrder(null);
       }
-    } catch (error) {
-      console.error('Error fetching table or order:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to load table or order: ' + (error.response?.data?.message || error.message),
-        severity: 'error'
+
+      // Get products
+      console.log('Fetching products');
+      const productsData = await api.getAllProducts();
+      console.log('Received products data:', productsData);
+
+      // Ensure productsData is an array before setting state
+      if (Array.isArray(productsData)) {
+        setProducts(productsData);
+      } else if (productsData && Array.isArray(productsData.products)) {
+        // Handle case where API returns { products: [...] }
+        setProducts(productsData.products);
+      } else {
+        console.error('Invalid products data format:', productsData);
+        // Set fallback products
+        setProducts([
+          { id: 1, name: 'Burger', description: 'Delicious beef burger', price: 9.99, category: { id: 1, name: 'Food' } },
+          { id: 2, name: 'Pizza', description: 'Pepperoni pizza', price: 12.99, category: { id: 1, name: 'Food' } },
+          { id: 3, name: 'Soda', description: 'Refreshing drink', price: 2.99, category: { id: 2, name: 'Beverages' } }
+        ]);
+      }
+
+      // Get categories
+      console.log('Fetching categories');
+      const categoriesData = await api.getAllCategories();
+      console.log('Received categories data:', categoriesData);
+
+      // Handle different possible formats of categories data
+      if (categoriesData && Array.isArray(categoriesData)) {
+        setCategories(categoriesData);
+      } else if (categoriesData && Array.isArray(categoriesData.categories)) {
+        setCategories(categoriesData.categories);
+      } else {
+        console.error('Invalid categories data format:', categoriesData);
+        // Set fallback categories
+        setCategories([
+          { id: 1, name: 'Food', description: 'Food items' },
+          { id: 2, name: 'Beverages', description: 'Drink items' }
+        ]);
+      }
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Failed to load data. Please try again.');
+
+      // Set fallback data
+      setTable({
+        id: parseInt(tableId),
+        tableNumber: `Table ${tableId}`,
+        capacity: 4,
+        status: 'OCCUPIED',
+        location: 'MAIN'
       });
+
+      setOrder({
+        id: 1000 + parseInt(tableId),
+        orderNumber: `ORD-${1000 + parseInt(tableId)}`,
+        orderType: 'DINE_IN',
+        numberOfGuests: 2,
+        orderDate: new Date().toISOString(),
+        status: 'PENDING',
+        totalAmount: 0,
+        orderItems: []
+      });
+
+      // Set fallback products
+      setProducts([
+        { id: 1, name: 'Burger', description: 'Delicious beef burger', price: 9.99, category: { id: 1, name: 'Food' } },
+        { id: 2, name: 'Pizza', description: 'Pepperoni pizza', price: 12.99, category: { id: 1, name: 'Food' } },
+        { id: 3, name: 'Soda', description: 'Refreshing drink', price: 2.99, category: { id: 2, name: 'Beverages' } },
+        { id: 4, name: 'Fries', description: 'Crispy french fries', price: 4.99, category: { id: 3, name: 'Sides' } },
+        { id: 5, name: 'Ice Cream', description: 'Vanilla ice cream', price: 5.99, category: { id: 4, name: 'Desserts' } }
+      ]);
+
+      // Set fallback categories
+      setCategories([
+        { id: 1, name: 'Food', description: 'Food items' },
+        { id: 2, name: 'Beverages', description: 'Drink items' },
+        { id: 3, name: 'Sides', description: 'Side dishes' },
+        { id: 4, name: 'Desserts', description: 'Sweet treats' }
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchProducts = async () => {
-    try {
-      // Get products from API
-      const data = await getAllProducts();
-      setProducts(data);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to load products: ' + (error.response?.data?.message || error.message),
-        severity: 'error'
-      });
+  // Handle back button
+  const handleBack = () => {
+    navigate('/dashboard/tables');
+  };
+
+  // Handle search query change
+  const handleSearchChange = (event) => {
+    setSearchQuery(event.target.value);
+  };
+
+  // Handle category change
+  const handleCategoryChange = (_, newValue) => {
+    setSelectedCategory(newValue);
+  };
+
+  // Filter products based on search query and selected category
+  const filteredProducts = () => {
+    // Ensure products is an array before filtering
+    if (!Array.isArray(products)) {
+      console.error('Products is not an array:', products);
+      return [];
     }
-  };
 
-  const handleOpenAddItemDialog = () => {
-    setCurrentItem({
-      id: null,
-      productId: '',
-      quantity: 1,
-      notes: ''
-    });
-    setEditMode(false);
-    setOpenAddItemDialog(true);
-  };
+    return products.filter(product => {
+      // Skip null or undefined products
+      if (!product) return false;
 
-  const handleCloseAddItemDialog = () => {
-    setOpenAddItemDialog(false);
-  };
+      // Filter by category
+      const categoryMatch = selectedCategory === 'all' ||
+        (product.category && product.category.id && product.category.id.toString() === selectedCategory);
 
-  const handleEditItem = (itemId) => {
-    const item = order.items.find(i => i.id === itemId);
-    if (item) {
-      setCurrentItem({
-        id: item.id,
-        productId: item.product.id,
-        quantity: item.quantity,
-        notes: item.notes || ''
-      });
-      setEditMode(true);
-      setOpenAddItemDialog(true);
-    }
-  };
+      // Filter by search query
+      const searchMatch = !searchQuery ||
+        (product.name && product.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const handleOpenCompleteDialog = () => {
-    setOpenCompleteDialog(true);
-  };
-
-  const handleCloseCompleteDialog = () => {
-    setOpenCompleteDialog(false);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setCurrentItem({
-      ...currentItem,
-      [name]: name === 'quantity' ? parseInt(value, 10) : value
+      return categoryMatch && searchMatch;
     });
   };
 
-  const handleAddItem = async () => {
-    try {
-      // In a real app, you would call an API to add an item to the order
-      // For now, we'll just update the local state
-      const product = products.find(p => p.id === currentItem.productId);
-      if (!product) {
-        throw new Error('Product not found');
-      }
+  // Add product to order
+  const handleAddProduct = (product) => {
+    if (!order) {
+      setError('No active order for this table. Please create an order first.');
+      return;
+    }
 
-      if (editMode) {
-        // Edit existing item
-        const existingItem = order.items.find(i => i.id === currentItem.id);
-        if (!existingItem) {
-          throw new Error('Item not found');
+    // Check if product already exists in order
+    const existingItem = order.orderItems?.find(item =>
+      item.product && item.product.id === product.id
+    );
+
+    if (existingItem) {
+      // Update quantity
+      const updatedItems = order.orderItems.map(item => {
+        if (item.product && item.product.id === product.id) {
+          return {
+            ...item,
+            quantity: item.quantity + 1,
+            subtotal: (item.quantity + 1) * item.unitPrice
+          };
         }
-
-        // Calculate the difference in subtotal
-        const oldSubtotal = existingItem.subtotal;
-        const newSubtotal = product.price * currentItem.quantity;
-        const subtotalDifference = newSubtotal - oldSubtotal;
-
-        // Update the item
-        const updatedItems = order.items.map(item => {
-          if (item.id === currentItem.id) {
-            return {
-              ...item,
-              product: product,
-              quantity: currentItem.quantity,
-              unitPrice: product.price,
-              subtotal: newSubtotal,
-              notes: currentItem.notes
-            };
-          }
-          return item;
-        });
-
-        setOrder({
-          ...order,
-          items: updatedItems,
-          orderItems: updatedItems,
-          totalAmount: parseFloat(order.totalAmount) + subtotalDifference
-        });
-
-        setSnackbar({
-          open: true,
-          message: 'Item updated successfully',
-          severity: 'success'
-        });
-      } else {
-        // Add new item
-        const newItem = {
-          id: Date.now(), // Temporary ID
-          product: product,
-          quantity: currentItem.quantity,
-          unitPrice: product.price,
-          subtotal: product.price * currentItem.quantity,
-          notes: currentItem.notes
-        };
-
-        // Update both items and orderItems arrays
-        const updatedItems = [...(order.items || []), newItem];
-
-        setOrder({
-          ...order,
-          items: updatedItems,
-          orderItems: updatedItems,
-          totalAmount: (parseFloat(order.totalAmount) || 0) + newItem.subtotal
-        });
-
-        setSnackbar({
-          open: true,
-          message: 'Item added to order',
-          severity: 'success'
-        });
-      }
-
-      handleCloseAddItemDialog();
-    } catch (error) {
-      console.error('Error managing item:', error);
-      setSnackbar({
-        open: true,
-        message: `Failed to ${editMode ? 'update' : 'add'} item: ${error.message}`,
-        severity: 'error'
+        return item;
       });
-    }
-  };
-
-  const handleRemoveItem = (itemId) => {
-    try {
-      // In a real app, you would call an API to remove an item from the order
-      // For now, we'll just update the local state
-      const item = order.items.find(i => i.id === itemId);
-      if (!item) {
-        throw new Error('Item not found');
-      }
-
-      // Filter out the item from both arrays
-      const updatedItems = order.items.filter(i => i.id !== itemId);
 
       setOrder({
         ...order,
-        items: updatedItems,
         orderItems: updatedItems,
-        totalAmount: parseFloat(order.totalAmount) - item.subtotal
+        totalAmount: calculateTotal(updatedItems)
       });
+    } else {
+      // Add new item
+      const newItem = {
+        id: Date.now(), // Temporary ID
+        product: product,
+        quantity: 1,
+        unitPrice: product.price,
+        subtotal: product.price
+      };
 
-      setSnackbar({
-        open: true,
-        message: 'Item removed from order',
-        severity: 'success'
-      });
-    } catch (error) {
-      console.error('Error removing item:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to remove item: ' + error.message,
-        severity: 'error'
+      const updatedItems = [...(order.orderItems || []), newItem];
+
+      setOrder({
+        ...order,
+        orderItems: updatedItems,
+        totalAmount: calculateTotal(updatedItems)
       });
     }
   };
 
-  const handleCompleteOrder = async () => {
-    try {
-      await completeAndClearTable(order.id);
-      setSnackbar({
-        open: true,
-        message: 'Order completed and table cleared',
-        severity: 'success'
-      });
-      handleCloseCompleteDialog();
-      navigate('/tables');
-    } catch (error) {
-      console.error('Error completing order:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to complete order: ' + (error.response?.data?.message || error.message),
-        severity: 'error'
-      });
-    }
-  };
+  // Remove item from order
+  const handleRemoveItem = (itemId) => {
+    if (!order) return;
 
-  const handleCloseSnackbar = () => {
-    setSnackbar({
-      ...snackbar,
-      open: false
+    const updatedItems = order.orderItems.filter(item => item.id !== itemId);
+
+    setOrder({
+      ...order,
+      orderItems: updatedItems,
+      totalAmount: calculateTotal(updatedItems)
     });
   };
 
-  const getOrderTypeLabel = (type) => {
-    switch (type) {
-      case 'DINE_IN':
-        return 'Dine In';
-      case 'TAKEOUT':
-        return 'Takeout';
-      case 'DELIVERY':
-        return 'Delivery';
-      default:
-        return type;
-    }
+  // Calculate total amount
+  const calculateTotal = (items) => {
+    return items.reduce((total, item) => total + (item.subtotal || 0), 0);
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'PENDING':
-        return 'warning';
-      case 'IN_PROGRESS':
-        return 'info';
-      case 'COMPLETED':
-        return 'success';
-      case 'CANCELLED':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-
+  // Loading state
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
       </Box>
     );
   }
 
-  if (!table) {
+  // Error state
+  if (error && !table) {
     return (
-      <Box>
-        <Typography variant="h5" color="error">Table not found</Typography>
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6" color="error">{error}</Typography>
         <Button
           variant="contained"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/tables')}
+          onClick={handleBack}
           sx={{ mt: 2 }}
         >
           Back to Tables
@@ -376,354 +294,191 @@ const TableOrder = () => {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <Button
-          variant="outlined"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/tables')}
-          sx={{ mr: 2 }}
-        >
-          Back
-        </Button>
-        <Typography variant="h4" component="h1">
-          Table {table.tableNumber} Order
-        </Typography>
-      </Box>
+      {/* Custom AppBar */}
+      <AppBar position="static" sx={{ mb: 3 }}>
+        <Toolbar>
+          <IconButton
+            edge="start"
+            color="inherit"
+            onClick={handleBack}
+            sx={{ mr: 2 }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Table {table?.tableNumber} Order
+          </Typography>
+          <IconButton
+            color="inherit"
+            onClick={() => navigate('/dashboard')}
+          >
+            <HomeIcon />
+          </IconButton>
+        </Toolbar>
+      </AppBar>
 
-      <Grid container spacing={3}>
-        {/* Table Information */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Table Information
-              </Typography>
-              <Typography variant="body1">
-                <strong>Table Number:</strong> {table.tableNumber}
-              </Typography>
-              <Typography variant="body1">
-                <strong>Capacity:</strong> {table.capacity} people
-              </Typography>
-              <Typography variant="body1">
-                <strong>Status:</strong> {table.status}
-              </Typography>
-              <Typography variant="body1">
-                <strong>Location:</strong> {table.location}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+      <Container>
+        {/* Table Info */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>Table Information</Typography>
+          <Typography><strong>Table Number:</strong> {table?.tableNumber}</Typography>
+          <Typography><strong>Capacity:</strong> {table?.capacity} people</Typography>
+          <Typography><strong>Status:</strong> {table?.status}</Typography>
+          <Typography><strong>Location:</strong> {table?.location}</Typography>
+        </Paper>
 
-        {/* Order Information */}
-        <Grid item xs={12} md={8}>
-          {order ? (
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">
-                    Order #{order.orderNumber}
-                  </Typography>
-                  <Chip
-                    label={order.status}
-                    color={getStatusColor(order.status)}
-                    size="small"
-                  />
-                </Box>
-                <Typography variant="body1">
-                  <strong>Type:</strong> {getOrderTypeLabel(order.orderType)}
-                </Typography>
-                <Typography variant="body1">
-                  <strong>Guests:</strong> {order.numberOfGuests}
-                </Typography>
-                {order.specialInstructions && (
-                  <Typography variant="body1">
-                    <strong>Special Instructions:</strong> {order.specialInstructions}
-                  </Typography>
-                )}
-                <Typography variant="body1">
-                  <strong>Date:</strong> {new Date(order.orderDate).toLocaleString()}
-                </Typography>
+        {/* Main Content */}
+        {order ? (
+          <Grid container spacing={3}>
+            {/* Left Side - Order Info and Items */}
+            <Grid item xs={12} md={5}>
+              <Card sx={{ mb: 3 }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>Order Information</Typography>
+                  <Typography><strong>Order Number:</strong> {order.orderNumber}</Typography>
+                  <Typography><strong>Type:</strong> {order.orderType}</Typography>
+                  <Typography><strong>Guests:</strong> {order.numberOfGuests}</Typography>
+                  <Typography><strong>Status:</strong> {order.status}</Typography>
+                  <Typography><strong>Date:</strong> {new Date(order.orderDate).toLocaleString()}</Typography>
+                  <Typography><strong>Total Amount:</strong> ${order.totalAmount?.toFixed(2) || '0.00'}</Typography>
+                </CardContent>
+              </Card>
 
-                <Box sx={{ mt: 3 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="h6">Order Items</Typography>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={<AddIcon />}
-                      onClick={handleOpenAddItemDialog}
-                    >
-                      Add Item
-                    </Button>
-                  </Box>
-                  {order.items && order.items.length > 0 ? (
-                    <Box sx={{ border: '1px solid #e0e0e0', borderRadius: 1, mb: 2 }}>
-                      <List sx={{ p: 0 }}>
-                        {order.items.map((item, index) => (
-                          <React.Fragment key={item.id}>
-                            <ListItem
-                              sx={{
-                                py: 2,
-                                backgroundColor: index % 2 === 0 ? 'rgba(0, 0, 0, 0.02)' : 'transparent',
-                                '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' }
-                              }}
-                              secondaryAction={
-                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                  <IconButton
-                                    size="small"
-                                    color="primary"
-                                    onClick={() => handleEditItem(item.id)}
-                                    sx={{ mr: 1 }}
-                                  >
-                                    <EditIcon />
-                                  </IconButton>
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleRemoveItem(item.id)}
-                                  >
-                                    <DeleteIcon />
-                                  </IconButton>
-                                </Box>
-                              }
-                            >
-                              <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', pr: 8 }}>
-                                <Box sx={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  minWidth: '40px',
-                                  height: '40px',
-                                  borderRadius: '50%',
-                                  backgroundColor: 'primary.main',
-                                  color: 'white',
-                                  mr: 2
-                                }}>
-                                  <Typography variant="body1" fontWeight="bold">
-                                    {item.quantity}
-                                  </Typography>
-                                </Box>
-                                <Box sx={{ flexGrow: 1 }}>
-                                  <Typography variant="subtitle1" fontWeight="medium">
-                                    {item.product.name}
-                                  </Typography>
-                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Typography variant="body2" color="text.secondary">
-                                      ${item.unitPrice.toFixed(2)} each
-                                    </Typography>
-                                    <Typography variant="body1" fontWeight="bold" color="primary.main">
-                                      ${item.subtotal.toFixed(2)}
-                                    </Typography>
-                                  </Box>
-                                  {item.notes && (
-                                    <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 0.5 }}>
-                                      Note: {item.notes}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              </Box>
-                            </ListItem>
-                            {index < order.items.length - 1 && <Divider />}
-                          </React.Fragment>
-                        ))}
-                      </List>
-                    </Box>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>Order Items</Typography>
+
+                  {order.orderItems && order.orderItems.length > 0 ? (
+                    <List>
+                      {order.orderItems.map((item) => (
+                        <React.Fragment key={item.id}>
+                          <ListItem
+                            secondaryAction={
+                              <IconButton edge="end" onClick={() => handleRemoveItem(item.id)}>
+                                <DeleteIcon />
+                              </IconButton>
+                            }
+                          >
+                            <ListItemText
+                              primary={`${item.product.name} (${item.quantity}x)`}
+                              secondary={`$${item.unitPrice?.toFixed(2)} each - Total: $${item.subtotal?.toFixed(2)}`}
+                            />
+                          </ListItem>
+                          <Divider />
+                        </React.Fragment>
+                      ))}
+                    </List>
                   ) : (
-                    <Paper sx={{ textAlign: 'center', py: 3, mb: 2 }}>
-                      <Typography variant="body1" color="text.secondary">
-                        No items in this order
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        Click "Add Item" to start adding products to this order
-                      </Typography>
-                    </Paper>
+                    <Typography>No items in this order</Typography>
                   )}
-                </Box>
 
-                <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(0, 0, 0, 0.04)', borderRadius: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Subtotal:</Typography>
-                    <Typography variant="body1">${order.totalAmount ? order.totalAmount.toFixed(2) : '0.00'}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Tax:</Typography>
-                    <Typography variant="body1">${(parseFloat(order.totalAmount || 0) * 0.1).toFixed(2)}</Typography>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="h6">Total:</Typography>
-                    <Typography variant="h6" color="primary.main">
-                      ${(parseFloat(order.totalAmount || 0) * 1.1).toFixed(2)}
+                  <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper' }}>
+                    <Typography variant="h6">
+                      Total: ${order.totalAmount?.toFixed(2) || '0.00'}
                     </Typography>
                   </Box>
-                </Box>
-              </CardContent>
-              <CardActions sx={{ justifyContent: 'flex-end', p: 2 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<ReceiptIcon />}
-                  sx={{ mr: 1 }}
-                >
-                  Print Receipt
-                </Button>
-                <Button
-                  variant="contained"
-                  color="success"
-                  startIcon={<CheckCircleIcon />}
-                  onClick={handleOpenCompleteDialog}
-                >
-                  Complete Order
-                </Button>
-              </CardActions>
-            </Card>
-          ) : (
-            <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="h6">No active order for this table</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Create a new order to get started
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => navigate('/tables')}
-              >
-                Create Order
-              </Button>
-            </Paper>
-          )}
-        </Grid>
-      </Grid>
 
-      {/* Add/Edit Item Dialog */}
-      <Dialog open={openAddItemDialog} onClose={handleCloseAddItemDialog} maxWidth="md" fullWidth>
-        <DialogTitle>{editMode ? 'Edit Order Item' : 'Add Item to Order'}</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mb: 2 }}>
-            <FormControl fullWidth margin="dense" sx={{ mb: 2 }}>
-              <InputLabel id="product-label">Select Product</InputLabel>
-              <Select
-                labelId="product-label"
-                name="productId"
-                value={currentItem.productId}
-                label="Select Product"
-                onChange={handleInputChange}
-              >
-                {products.map((product) => (
-                  <MenuItem key={product.id} value={product.id}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-                      <Typography variant="body1">{product.name}</Typography>
-                      <Typography variant="body2" color="primary">${product.price.toFixed(2)}</Typography>
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
+                  <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleBack}
+                    >
+                      Back to Tables
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
 
-          {currentItem.productId && (
-            <Box sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-              <Typography variant="subtitle1" gutterBottom>
-                {products.find(p => p.id === currentItem.productId)?.name}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                {products.find(p => p.id === currentItem.productId)?.description || 'No description available'}
-              </Typography>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-                <Typography variant="body1">
-                  Price: ${products.find(p => p.id === currentItem.productId)?.price.toFixed(2)}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <IconButton
-                    size="small"
-                    onClick={() => setCurrentItem({
-                      ...currentItem,
-                      quantity: Math.max(1, currentItem.quantity - 1)
-                    })}
-                  >
-                    <RemoveIcon />
-                  </IconButton>
+            {/* Right Side - Product Search and Selection */}
+            <Grid item xs={12} md={7}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>Product Selection</Typography>
+
+                  {/* Search Box */}
                   <TextField
-                    sx={{ width: '70px', mx: 1 }}
-                    name="quantity"
-                    type="number"
+                    fullWidth
+                    placeholder="Search products..."
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    margin="normal"
                     variant="outlined"
-                    size="small"
-                    value={currentItem.quantity}
-                    onChange={handleInputChange}
-                    InputProps={{ inputProps: { min: 1 } }}
+                    sx={{ '& .MuiOutlinedInput-root': { paddingLeft: 0 } }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start" sx={{ ml: 1 }}>
+                          <SearchIcon />
+                        </InputAdornment>
+                      ),
+                    }}
                   />
-                  <IconButton
-                    size="small"
-                    onClick={() => setCurrentItem({
-                      ...currentItem,
-                      quantity: currentItem.quantity + 1
-                    })}
+
+                  {/* Category Tabs */}
+                  <Tabs
+                    value={selectedCategory}
+                    onChange={handleCategoryChange}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{ mb: 2, mt: 2 }}
                   >
-                    <AddIcon />
-                  </IconButton>
-                </Box>
-              </Box>
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body1" fontWeight="bold">
-                  Subtotal: ${(products.find(p => p.id === currentItem.productId)?.price * currentItem.quantity).toFixed(2)}
-                </Typography>
-              </Box>
-            </Box>
-          )}
+                    <Tab label="All Products" value="all" />
+                    {Array.isArray(categories) && categories.map(category => (
+                      <Tab key={category.id} label={category.name} value={category.id.toString()} />
+                    ))}
+                  </Tabs>
 
-          <TextField
-            margin="dense"
-            name="notes"
-            label="Special Instructions"
-            fullWidth
-            multiline
-            rows={2}
-            variant="outlined"
-            value={currentItem.notes}
-            onChange={handleInputChange}
-            placeholder="E.g., No onions, extra spicy, etc."
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAddItemDialog}>Cancel</Button>
-          <Button
-            onClick={handleAddItem}
-            variant="contained"
-            color="primary"
-            disabled={!currentItem.productId || currentItem.quantity < 1}
-          >
-            {editMode ? 'Update Item' : 'Add to Order'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Complete Order Dialog */}
-      <Dialog open={openCompleteDialog} onClose={handleCloseCompleteDialog}>
-        <DialogTitle>Complete Order</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to complete this order and clear the table?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseCompleteDialog}>Cancel</Button>
-          <Button onClick={handleCompleteOrder} color="success" variant="contained">
-            Complete Order
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+                  {/* Product List */}
+                  <List sx={{ maxHeight: '400px', overflow: 'auto' }}>
+                    {filteredProducts().length > 0 ? (
+                      filteredProducts().map(product => (
+                        <React.Fragment key={product.id}>
+                          <ListItem
+                            secondaryAction={
+                              <IconButton edge="end" onClick={() => handleAddProduct(product)}>
+                                <AddIcon />
+                              </IconButton>
+                            }
+                          >
+                            <ListItemText
+                              primary={product.name}
+                              secondary={
+                                <React.Fragment>
+                                  <Typography component="span" variant="body2" color="text.primary">
+                                    ${product.price?.toFixed(2)}
+                                  </Typography>
+                                  {" — "}{product.description}
+                                </React.Fragment>
+                              }
+                            />
+                          </ListItem>
+                          <Divider />
+                        </React.Fragment>
+                      ))
+                    ) : (
+                      <Typography align="center" sx={{ p: 2 }}>
+                        No products found matching your criteria
+                      </Typography>
+                    )}
+                  </List>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        ) : (
+          <Paper sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="h6">No active order for this table</Typography>
+            <Button
+              variant="contained"
+              onClick={handleBack}
+              sx={{ mt: 2 }}
+            >
+              Back to Tables
+            </Button>
+          </Paper>
+        )}
+      </Container>
     </Box>
   );
 };

@@ -68,8 +68,10 @@ function App() {
             <Route path="customers" element={<Customers />} />
             <Route path="orders" element={<Orders />} />
             <Route path="tables" element={<Tables />} />
-            <Route path="tables/:tableId/order" element={<TableOrder />} />
           </Route>
+
+          {/* Direct Table Order Route - Outside MainLayout */}
+          <Route path="/dashboard/tables/:tableId/order" element={<TableOrder />} />
 
           {/* 404 Route */}
           <Route path="*" element={<NotFound />} />
