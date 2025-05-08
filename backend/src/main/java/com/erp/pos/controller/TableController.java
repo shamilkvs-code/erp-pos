@@ -71,7 +71,7 @@ public class TableController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String location,
             @RequestParam(required = false) Integer capacity) {
-        
+
         try {
             // Use the service method to get filtered tables
             List<RestaurantTable> tables = tableService.getFilteredTables(status, location, capacity);
@@ -80,7 +80,7 @@ public class TableController {
             List<TableDTO> tableDTOs = tables.stream()
                     .map(TableDTO::fromEntity)
                     .collect(Collectors.toList());
-                    
+
             return ResponseEntity.ok(tableDTOs);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
@@ -221,5 +221,24 @@ public class TableController {
         return tables.stream()
                 .map(TableDTO::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Mark a table as available after cleaning
+     */
+    @PostMapping("/{tableId}/mark-available")
+    @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
+    public TableDTO markTableAsAvailable(@PathVariable Long tableId) {
+        // Get the table
+        RestaurantTable table = tableService.getTableById(tableId);
+
+        // Check if the table is in CLEANING status
+        if (table.getStatus() != RestaurantTable.TableStatus.CLEANING) {
+            throw new IllegalStateException("Table must be in CLEANING status to mark as available");
+        }
+
+        // Change the table status to AVAILABLE
+        RestaurantTable updatedTable = tableService.changeTableStatus(tableId, RestaurantTable.TableStatus.AVAILABLE);
+        return TableDTO.fromEntity(updatedTable);
     }
 }
