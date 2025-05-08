@@ -545,7 +545,7 @@ export const getOrdersByTable = async (tableId) => {
 
 export const getCurrentTableOrder = async (tableId, signal) => {
   try {
-    console.log(`Fetching current order for table ${tableId}`);
+    console.log(`Fetching current order for table ${tableId} using correct API endpoint: /api/orders/table/${tableId}/current`);
 
     // Get the token from localStorage
     const userStr = localStorage.getItem('user');
@@ -568,6 +568,7 @@ export const getCurrentTableOrder = async (tableId, signal) => {
     // Log token status
     console.log('Token status for getCurrentTableOrder request:', token ? 'Token exists' : 'No token');
 
+    // Use the correct API endpoint as per documentation
     const response = await axios.get(`${API_URL}/orders/table/${tableId}/current`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
@@ -702,6 +703,7 @@ export const addItemToOrder = async (orderId, item) => {
       subtotal: item.subtotal || (item.quantity || 1) * (item.unitPrice || item.product.price)
     };
 
+    // First try the direct endpoint for adding items to an order
     const response = await axios.post(`${API_URL}/orders/${orderId}/items`, itemData, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
@@ -729,11 +731,11 @@ export const addItemToOrder = async (orderId, item) => {
   } catch (error) {
     console.error('Error in addItemToOrder:', error.response?.data || error.message);
 
-    // Try fallback approach - update the entire order
+    // Try the table cart endpoint as a fallback
     try {
-      console.log('Trying fallback approach - updating entire order');
+      console.log('Trying table cart endpoint as fallback');
 
-      // Get the current order
+      // Get the table ID from the order
       const orderResponse = await axios.get(`${API_URL}/orders/${orderId}`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -742,54 +744,109 @@ export const addItemToOrder = async (orderId, item) => {
       });
 
       const currentOrder = orderResponse.data;
-      console.log('Current order:', currentOrder);
+      const tableId = currentOrder.tableId;
 
-      // Add the new item to the order
-      const newItem = {
-        ...item,
-        id: Date.now(), // Temporary ID
+      if (!tableId) {
+        throw new Error('Could not determine table ID for order');
+      }
+
+      console.log(`Using table cart endpoint for table ${tableId}`);
+
+      // Use the table cart endpoint
+      const cartResponse = await axios.post(`${API_URL}/orders/table/${tableId}/cart`, {
+        orderId: orderId,
+        productId: item.product.id,
         quantity: item.quantity || 1,
-        unitPrice: item.unitPrice || item.product.price,
-        subtotal: item.subtotal || (item.quantity || 1) * (item.unitPrice || item.product.price)
-      };
-
-      const updatedItems = [...(currentOrder.orderItems || []), newItem];
-      const totalAmount = updatedItems.reduce((total, item) => total + (item.subtotal || 0), 0);
-
-      const updatedOrder = {
-        ...currentOrder,
-        orderItems: updatedItems,
-        totalAmount: totalAmount
-      };
-
-      // Update the order
-      const updateResponse = await axios.put(`${API_URL}/orders/${orderId}`, updatedOrder, {
+        unitPrice: item.unitPrice || item.product.price
+      }, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         }
       });
 
-      console.log('Update order response (fallback):', updateResponse.data);
+      console.log('Table cart response:', cartResponse.data);
 
       // Check if response.data is a string and try to parse it
-      if (typeof updateResponse.data === 'string') {
+      if (typeof cartResponse.data === 'string') {
         try {
           console.log('Response data is a string, attempting to parse as JSON');
-          const parsedData = JSON.parse(updateResponse.data);
+          const parsedData = JSON.parse(cartResponse.data);
           console.log('Successfully parsed response data:', parsedData);
           return parsedData;
         } catch (parseError) {
           console.error('Error parsing response data as JSON:', parseError);
           // If parsing fails, return the original data
-          return updateResponse.data;
+          return cartResponse.data;
         }
       }
 
-      return updateResponse.data;
-    } catch (fallbackError) {
-      console.error('Error in addItemToOrder fallback:', fallbackError.response?.data || fallbackError.message);
-      throw fallbackError;
+      return cartResponse.data;
+    } catch (cartError) {
+      console.error('Error using table cart endpoint:', cartError.response?.data || cartError.message);
+
+      // Try fallback approach - update the entire order
+      try {
+        console.log('Trying fallback approach - updating entire order');
+
+        // Get the current order
+        const orderResponse = await axios.get(`${API_URL}/orders/${orderId}`, {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const currentOrder = orderResponse.data;
+        console.log('Current order:', currentOrder);
+
+        // Add the new item to the order
+        const newItem = {
+          ...item,
+          id: Date.now(), // Temporary ID
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || item.product.price,
+          subtotal: item.subtotal || (item.quantity || 1) * (item.unitPrice || item.product.price)
+        };
+
+        const updatedItems = [...(currentOrder.orderItems || []), newItem];
+        const totalAmount = updatedItems.reduce((total, item) => total + (item.subtotal || 0), 0);
+
+        const updatedOrder = {
+          ...currentOrder,
+          orderItems: updatedItems,
+          totalAmount: totalAmount
+        };
+
+        // Update the order
+        const updateResponse = await axios.put(`${API_URL}/orders/${orderId}`, updatedOrder, {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('Update order response (fallback):', updateResponse.data);
+
+        // Check if response.data is a string and try to parse it
+        if (typeof updateResponse.data === 'string') {
+          try {
+            console.log('Response data is a string, attempting to parse as JSON');
+            const parsedData = JSON.parse(updateResponse.data);
+            console.log('Successfully parsed response data:', parsedData);
+            return parsedData;
+          } catch (parseError) {
+            console.error('Error parsing response data as JSON:', parseError);
+            // If parsing fails, return the original data
+            return updateResponse.data;
+          }
+        }
+
+        return updateResponse.data;
+      } catch (fallbackError) {
+        console.error('Error in addItemToOrder fallback:', fallbackError.response?.data || fallbackError.message);
+        throw fallbackError;
+      }
     }
   }
 };
@@ -1276,9 +1333,120 @@ export const assignOrderToTable = async (tableId, orderId) => {
   }
 };
 
+export const addItemToTableCart = async (tableId, item) => {
+  try {
+    console.log(`Adding item to table ${tableId} cart using correct API endpoint: /api/orders/table/${tableId}/cart`);
+    console.log('Item data:', item);
+
+    // Get the token from localStorage
+    const userStr = localStorage.getItem('user');
+    let token = null;
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        token = user.token;
+      } catch (e) {
+        console.error('Error parsing user from localStorage:', e);
+      }
+    }
+
+    // If no token in user object, try fallback
+    if (!token) {
+      token = localStorage.getItem('token');
+    }
+
+    // Log token status
+    console.log('Token status for addItemToTableCart request:', token ? 'Token exists' : 'No token');
+
+    // Prepare the request data according to API documentation
+    const requestData = {
+      productId: item.product.id,
+      quantity: item.quantity || 1,
+      unitPrice: item.unitPrice || item.product.price,
+      // If we have an orderId, include it to update existing order
+      orderId: item.orderId || null,
+      // Include number of guests for new orders
+      numberOfGuests: item.numberOfGuests || 1,
+      // Include special instructions if available
+      specialInstructions: item.specialInstructions || ""
+    };
+
+    console.log('Request data for cart endpoint:', requestData);
+
+    // Use the table cart endpoint as specified in the API documentation
+    const response = await axios.post(`${API_URL}/orders/table/${tableId}/cart`, requestData, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('Add item to table cart response:', response.data);
+
+    // Check if response.data is a string and try to parse it
+    if (typeof response.data === 'string') {
+      try {
+        console.log('Response data is a string, attempting to parse as JSON');
+        const parsedData = JSON.parse(response.data);
+        console.log('Successfully parsed response data:', parsedData);
+        return parsedData;
+      } catch (parseError) {
+        console.error('Error parsing response data as JSON:', parseError);
+        // If parsing fails, return the original data
+        return response.data;
+      }
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error('Error in addItemToTableCart:', error.response?.data || error.message);
+
+    // Try fallback approach - create or update order directly
+    try {
+      console.log('Trying fallback approach - create or update order directly');
+
+      // First check if there's an existing order for this table
+      console.log(`Fetching table data using GET /api/tables/${tableId}`);
+      const tableResponse = await axios.get(`${API_URL}/tables/${tableId}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const table = tableResponse.data;
+      console.log('Table data:', table);
+
+      if (table.currentOrderId) {
+        // If there's an existing order, add the item to it
+        console.log(`Adding item to existing order ${table.currentOrderId}`);
+        return await addItemToOrder(table.currentOrderId, item);
+      } else {
+        // If there's no existing order, create a new one using the correct endpoint
+        console.log(`Creating new order for table using POST /api/orders/table/${tableId}`);
+        return await createOrderForTable(tableId, {
+          numberOfGuests: item.numberOfGuests || 1,
+          orderItems: [{
+            productId: item.product.id,
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice || item.product.price,
+            subtotal: (item.quantity || 1) * (item.unitPrice || item.product.price)
+          }],
+          specialInstructions: item.specialInstructions || ""
+        });
+      }
+    } catch (fallbackError) {
+      console.error('Error in addItemToTableCart fallback:', fallbackError.response?.data || fallbackError.message);
+      throw fallbackError;
+    }
+  }
+};
+
 export const createOrderForTable = async (tableId, order) => {
   try {
-    console.log(`Creating order for table ${tableId} with data:`, order);
+    console.log(`Creating order for table ${tableId} using correct API endpoint: /api/orders/table/${tableId}`);
+    console.log('Order data:', order);
 
     // Get the token from localStorage
     const userStr = localStorage.getItem('user');
@@ -1301,71 +1469,56 @@ export const createOrderForTable = async (tableId, order) => {
     // Log token status
     console.log('Token status for createOrderForTable request:', token ? 'Token exists' : 'No token');
 
-    // Make sure all required fields are present
+    // Format the order data according to API documentation
     const orderData = {
-      ...order,
-      orderDate: order.orderDate || new Date().toISOString(),
+      customerId: order.customerId || null,
+      numberOfGuests: order.numberOfGuests || 1,
+      orderItems: order.orderItems || [],
+      specialInstructions: order.specialInstructions || "",
       totalAmount: order.totalAmount || 0.00,
-      status: order.status || 'PENDING',
-      orderItems: order.orderItems || []
+      orderType: order.orderType || "DINE_IN",
+      orderDate: order.orderDate || new Date().toISOString(),
+      status: order.status || 'PENDING'
     };
 
-    // Convert totalAmount to string with 2 decimal places
+    // Convert totalAmount to string with 2 decimal places if it's a number
     if (typeof orderData.totalAmount === 'number') {
       orderData.totalAmount = orderData.totalAmount.toFixed(2);
     }
 
-    // First try to create the order
-    const orderResponse = await axios.post(`${API_URL}/orders`, orderData, {
+    console.log('Formatted order data for API:', orderData);
+
+    // Use the correct API endpoint as per documentation
+    const response = await axios.post(`${API_URL}/orders/table/${tableId}`, orderData, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
         'Content-Type': 'application/json'
       }
     });
 
-    console.log('Order created:', orderResponse.data);
+    console.log('Order creation response:', response.data);
 
-    // Then update the table to link it to the order
-    const tableUpdate = {
-      status: 'OCCUPIED',
-      currentOrderId: orderResponse.data.id
-    };
-
-    const tableResponse = await axios.patch(`${API_URL}/tables/${tableId}`, tableUpdate, {
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json'
+    // Check if response.data is a string and try to parse it
+    if (typeof response.data === 'string') {
+      try {
+        console.log('Response data is a string, attempting to parse as JSON');
+        const parsedData = JSON.parse(response.data);
+        console.log('Successfully parsed response data:', parsedData);
+        return parsedData;
+      } catch (parseError) {
+        console.error('Error parsing response data as JSON:', parseError);
+        // If parsing fails, return the original data
+        return response.data;
       }
-    });
+    }
 
-    console.log('Table updated:', tableResponse.data);
-
-    // Return the created order
-    return orderResponse.data;
+    return response.data;
   } catch (error) {
     console.error('Error in createOrderForTable:', error.response?.data || error.message);
 
-    // Try fallback approach using the table-specific endpoint
+    // Fall back to the two-step approach if the table-specific endpoint fails
     try {
-      console.log('Trying fallback approach with table-specific endpoint');
-
-      // Get the token from localStorage
-      const userStr = localStorage.getItem('user');
-      let token = null;
-
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          token = user.token;
-        } catch (e) {
-          console.error('Error parsing user from localStorage:', e);
-        }
-      }
-
-      // If no token in user object, try fallback
-      if (!token) {
-        token = localStorage.getItem('token');
-      }
+      console.log('Falling back to two-step approach (create order + update table)');
 
       // Make sure all required fields are present
       const orderData = {
@@ -1373,7 +1526,9 @@ export const createOrderForTable = async (tableId, order) => {
         orderDate: order.orderDate || new Date().toISOString(),
         totalAmount: order.totalAmount || 0.00,
         status: order.status || 'PENDING',
-        orderItems: order.orderItems || []
+        orderItems: order.orderItems || [],
+        tableId: tableId, // Make sure tableId is included
+        orderType: order.orderType || "DINE_IN"
       };
 
       // Convert totalAmount to string with 2 decimal places
@@ -1381,15 +1536,37 @@ export const createOrderForTable = async (tableId, order) => {
         orderData.totalAmount = orderData.totalAmount.toFixed(2);
       }
 
-      const response = await axios.post(`${API_URL}/orders/table/${tableId}`, orderData, {
+      console.log('Fallback: Creating order with data:', orderData);
+
+      // First try to create the order
+      const orderResponse = await axios.post(`${API_URL}/orders`, orderData, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         }
       });
 
-      console.log('Order creation response (fallback):', response.data);
-      return response.data;
+      console.log('Order created:', orderResponse.data);
+
+      // Then update the table to link it to the order
+      const tableUpdate = {
+        status: 'OCCUPIED',
+        currentOrderId: orderResponse.data.id
+      };
+
+      console.log(`Fallback: Updating table ${tableId} with data:`, tableUpdate);
+
+      const tableResponse = await axios.patch(`${API_URL}/tables/${tableId}`, tableUpdate, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Table updated:', tableResponse.data);
+
+      // Return the created order
+      return orderResponse.data;
     } catch (fallbackError) {
       console.error('Error in createOrderForTable fallback:', fallbackError.response?.data || fallbackError.message);
       throw fallbackError;

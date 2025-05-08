@@ -70,15 +70,15 @@ const TableOrder = () => {
       setError(null);
 
       try {
-        // Get table data
-        console.log('Fetching table data for tableId:', tableId);
+        // Get table data using the correct API endpoint: GET /api/tables/{id}
+        console.log('Fetching table data for tableId using GET /api/tables/' + tableId);
         const tableData = await api.getTableById(tableId, signal);
         console.log('Received table data:', tableData);
         setTable(tableData);
 
-        // Try to get the current order for this table
+        // Try to get the current order for this table using the correct API endpoint: GET /api/orders/table/{tableId}/current
         try {
-          console.log('Fetching current order for table:', tableId);
+          console.log('Fetching current order for table using GET /api/orders/table/' + tableId + '/current');
           const currentOrder = await api.getCurrentTableOrder(tableId, signal);
           console.log('Current order data:', currentOrder);
 
@@ -290,22 +290,76 @@ const TableOrder = () => {
       if (order) {
         console.log('Saving order before navigating back:', order);
 
-        // Ensure order has all required fields
-        const orderToSave = {
-          ...order,
-          orderDate: order.orderDate || new Date().toISOString(),
-          status: order.status || 'PENDING',
-          orderItems: order.orderItems || [],
-          totalAmount: order.totalAmount || calculateTotal(order.orderItems || [])
-        };
+        // Skip saving if the order has a temporary ID (not yet saved to database)
+        if (order.id && order.id !== Date.now()) {
+          // Ensure order has all required fields
+          const orderToSave = {
+            ...order,
+            orderDate: order.orderDate || new Date().toISOString(),
+            status: order.status || 'PENDING',
+            orderItems: order.orderItems || [],
+            totalAmount: order.totalAmount || calculateTotal(order.orderItems || [])
+          };
 
-        try {
-          // Update the order in the database
-          await api.updateOrder(order.id, orderToSave);
-          console.log('Order saved successfully before navigation');
-        } catch (error) {
-          console.error('Error saving order before navigation:', error);
-          // Continue with navigation even if save fails
+          try {
+            // Update the order in the database
+            await api.updateOrder(order.id, orderToSave);
+            console.log('Order saved successfully before navigation');
+          } catch (error) {
+            console.error('Error saving order before navigation:', error);
+            // Continue with navigation even if save fails
+          }
+        } else {
+          console.log('Order has a temporary ID, attempting to save using correct table cart endpoint: POST /api/orders/table/' + tableId + '/cart');
+
+          // If the order has a temporary ID, try to save it using the table cart endpoint
+          try {
+            // Only save if there are items in the order
+            if (order.orderItems && order.orderItems.length > 0) {
+              const firstItem = order.orderItems[0];
+
+              // Use the first item to create an order with the correct API endpoint
+              console.log('Creating order with first item using POST /api/orders/table/' + tableId + '/cart');
+              await api.addItemToTableCart(tableId, {
+                product: firstItem.product,
+                quantity: firstItem.quantity,
+                unitPrice: firstItem.unitPrice,
+                numberOfGuests: order.numberOfGuests || 1,
+                specialInstructions: order.specialInstructions || ""
+              });
+
+              console.log('First item saved successfully');
+
+              // If there are more items, save them too
+              if (order.orderItems.length > 1) {
+                // Get the current order for this table to get its ID using the correct API endpoint
+                console.log('Fetching current order using GET /api/orders/table/' + tableId + '/current');
+                const currentOrder = await api.getCurrentTableOrder(tableId);
+
+                if (currentOrder && currentOrder.id) {
+                  console.log('Saving remaining items to order:', currentOrder.id);
+
+                  // Save the remaining items using the correct API endpoint
+                  for (let i = 1; i < order.orderItems.length; i++) {
+                    const item = order.orderItems[i];
+
+                    console.log(`Adding item ${i+1} to order ${currentOrder.id} using POST /api/orders/${currentOrder.id}/items`);
+                    await api.addItemToOrder(currentOrder.id, {
+                      product: item.product,
+                      quantity: item.quantity,
+                      unitPrice: item.unitPrice,
+                      specialInstructions: item.specialInstructions || ""
+                    });
+
+                    console.log(`Item ${i+1} saved successfully`);
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error saving temporary order before navigation:', error);
+            // Continue with navigation even if save fails
+          }
         }
       }
     } catch (error) {
@@ -426,139 +480,28 @@ const TableOrder = () => {
   const handleAddProduct = async (product) => {
     console.log('Adding product to order:', product);
 
-    if (!order) {
-      // Create a new order for this table
-      console.log('Creating new order for table:', tableId);
-
-      try {
-        // Create a new order object
-        const newOrder = {
-          tableId: parseInt(tableId),
-          orderNumber: `ORD-${Date.now()}`,
-          orderType: 'DINE_IN',
-          numberOfGuests: 1,
-          orderDate: new Date().toISOString(),
-          status: 'PENDING',
-          totalAmount: product.price,
-          orderItems: [
-            {
-              product: product,
-              quantity: 1,
-              unitPrice: product.price,
-              subtotal: product.price
-            }
-          ]
-        };
-
-        console.log('New order object:', newOrder);
-
-        // Try to create the order via API
-        try {
-          const createdOrder = await api.createOrderForTable(tableId, newOrder);
-          console.log('Order created successfully:', createdOrder);
-
-          // Check if createdOrder is a string (possibly a JSON string)
-          let processedOrder;
-          if (typeof createdOrder === 'string') {
-            try {
-              console.log('Created order is a string, attempting to parse as JSON');
-              const parsedOrder = JSON.parse(createdOrder);
-              console.log('Successfully parsed order data:', parsedOrder);
-
-              // Ensure the parsed order has the expected structure
-              processedOrder = {
-                ...parsedOrder,
-                orderItems: parsedOrder.orderItems || [],
-                totalAmount: parsedOrder.totalAmount || 0
-              };
-            } catch (parseError) {
-              console.error('Error parsing order data as JSON:', parseError);
-              // If parsing fails, use the original order data
-              processedOrder = {
-                ...newOrder,
-                id: Date.now(), // Generate a temporary ID
-                orderItems: newOrder.orderItems || [],
-                totalAmount: newOrder.totalAmount || 0
-              };
-            }
-          } else {
-            // Ensure the created order has the expected structure
-            processedOrder = {
-              ...createdOrder,
-              orderItems: createdOrder.orderItems || [],
-              totalAmount: createdOrder.totalAmount || 0
-            };
-          }
-
-          // Make sure orderItems have all required fields
-          if (processedOrder.orderItems.length > 0) {
-            processedOrder.orderItems = processedOrder.orderItems.map(item => ({
-              ...item,
-              quantity: item.quantity || 1,
-              unitPrice: item.unitPrice || (item.product ? item.product.price : 0),
-              subtotal: item.subtotal || (item.quantity || 1) * (item.unitPrice || (item.product ? item.product.price : 0))
-            }));
-          }
-
-          setOrder(processedOrder);
-
-          // Update table status
-          const updatedTable = { ...table, status: 'OCCUPIED', currentOrder: processedOrder };
-          setTable(updatedTable);
-
-          return;
-        } catch (apiError) {
-          console.error('Failed to create order via API:', apiError);
-          // Fall back to local state only
-        }
-
-        // If API call failed, just update local state
-        // Add a temporary ID to the order item
-        const orderItemWithId = {
-          ...newOrder.orderItems[0],
-          id: Date.now()
-        };
-
-        const localOrder = {
-          ...newOrder,
-          id: Date.now(),
-          orderItems: [orderItemWithId]
-        };
-
-        console.log('Setting local order state:', localOrder);
-        setOrder(localOrder);
-
-        // Update table status locally
-        const updatedTable = { ...table, status: 'OCCUPIED', currentOrder: localOrder };
-        setTable(updatedTable);
-      } catch (error) {
-        console.error('Error creating new order:', error);
-        setError('Failed to create a new order. Please try again.');
-      }
-
-      return;
-    }
-
     try {
-      console.log('Checking if product exists in order:', order);
+      // Update local state first for immediate UI feedback
+      let localOrder = order;
+      let localOrderItems = [];
+      let existingItem = null;
 
-      // Ensure order.orderItems is an array
-      if (!order.orderItems) {
-        order.orderItems = [];
+      if (localOrder) {
+        // Ensure order.orderItems is an array
+        localOrderItems = localOrder.orderItems || [];
+
+        // Check if product already exists in order
+        existingItem = localOrderItems.find(item =>
+          item.product && item.product.id === product.id
+        );
       }
 
-      // Check if product already exists in order
-      const existingItem = order.orderItems.find(item =>
-        item.product && item.product.id === product.id
-      );
-
-      console.log('Existing item:', existingItem);
-
+      // Update local state based on whether the item exists
       if (existingItem) {
-        console.log('Product already exists in order, updating quantity');
+        console.log('Product already exists in order, updating quantity locally');
 
-        // Update quantity
-        const updatedItems = order.orderItems.map(item => {
+        // Update quantity in local state
+        const updatedItems = localOrderItems.map(item => {
           if (item.product && item.product.id === product.id) {
             const newQuantity = item.quantity + 1;
             const newSubtotal = newQuantity * item.unitPrice;
@@ -576,174 +519,131 @@ const TableOrder = () => {
         });
 
         const newTotal = calculateTotal(updatedItems);
-        console.log(`Updating total from ${order.totalAmount} to ${newTotal}`);
+        console.log(`Updating total from ${localOrder.totalAmount} to ${newTotal}`);
 
         const updatedOrder = {
-          ...order,
+          ...localOrder,
           orderItems: updatedItems,
           totalAmount: newTotal
         };
 
-        console.log('Updated order:', updatedOrder);
-
-        // Update order in state first for immediate UI feedback
+        // Update local state
         setOrder(updatedOrder);
+        localOrder = updatedOrder;
+      } else if (localOrder) {
+        console.log('Product does not exist in order, adding new item locally');
 
-        // Then save to database
-        try {
-          const savedOrder = await api.updateOrder(order.id, updatedOrder);
-          console.log('Order updated in database:', savedOrder);
-
-          // Update state with the saved order if it was returned
-          if (savedOrder) {
-            // Check if savedOrder is a string (possibly a JSON string)
-            if (typeof savedOrder === 'string') {
-              try {
-                console.log('Saved order is a string, attempting to parse as JSON');
-                const parsedOrder = JSON.parse(savedOrder);
-                console.log('Successfully parsed order data:', parsedOrder);
-
-                // Ensure the parsed order has the expected structure
-                const processedOrder = {
-                  ...parsedOrder,
-                  orderItems: parsedOrder.orderItems || [],
-                  totalAmount: parsedOrder.totalAmount || 0
-                };
-
-                setOrder(processedOrder);
-              } catch (parseError) {
-                console.error('Error parsing order data as JSON:', parseError);
-                // If parsing fails, keep the local state
-              }
-            } else {
-              // Ensure the saved order has the expected structure
-              const processedOrder = {
-                ...savedOrder,
-                orderItems: savedOrder.orderItems || [],
-                totalAmount: savedOrder.totalAmount || 0
-              };
-
-              setOrder(processedOrder);
-            }
-          }
-        } catch (updateError) {
-          console.error('Error updating order in database:', updateError);
-          // We already updated the local state, so the UI is still responsive
-        }
-      } else {
-        console.log('Product does not exist in order, adding new item');
-
-        // Add new item
+        // Add new item to local state
         const newItem = {
+          id: Date.now(), // Temporary ID for local state
           product: product,
           quantity: 1,
           unitPrice: product.price,
           subtotal: product.price
         };
 
-        console.log('New item:', newItem);
-
-        // Add temporary ID for local state
-        const newItemWithId = {
-          ...newItem,
-          id: Date.now() // Temporary ID for local state
-        };
-
-        // Update local state first for immediate UI feedback
-        const updatedItems = [...order.orderItems, newItemWithId];
+        const updatedItems = [...localOrderItems, newItem];
         const newTotal = calculateTotal(updatedItems);
 
-        const locallyUpdatedOrder = {
-          ...order,
+        const updatedOrder = {
+          ...localOrder,
           orderItems: updatedItems,
           totalAmount: newTotal
         };
 
-        console.log('Locally updated order:', locallyUpdatedOrder);
-        setOrder(locallyUpdatedOrder);
+        // Update local state
+        setOrder(updatedOrder);
+        localOrder = updatedOrder;
+      } else {
+        console.log('No existing order, creating temporary local order');
 
-        // Then save to database
-        try {
-          // Try to add the item to the order
-          const updatedOrderData = await api.addItemToOrder(order.id, newItem);
-          console.log('Item added to order in database:', updatedOrderData);
+        // Create a temporary local order
+        const newItem = {
+          id: Date.now(), // Temporary ID for local state
+          product: product,
+          quantity: 1,
+          unitPrice: product.price,
+          subtotal: product.price
+        };
 
-          // Update state with the saved order if it was returned
-          if (updatedOrderData) {
-            // Check if updatedOrderData is a string (possibly a JSON string)
-            if (typeof updatedOrderData === 'string') {
-              try {
-                console.log('Updated order is a string, attempting to parse as JSON');
-                const parsedOrder = JSON.parse(updatedOrderData);
-                console.log('Successfully parsed order data:', parsedOrder);
+        const newOrder = {
+          id: Date.now(), // Temporary ID for local state
+          tableId: parseInt(tableId),
+          orderNumber: `ORD-${Date.now()}`,
+          orderType: 'DINE_IN',
+          numberOfGuests: 1,
+          orderDate: new Date().toISOString(),
+          status: 'PENDING',
+          totalAmount: product.price,
+          orderItems: [newItem]
+        };
 
-                // Ensure the parsed order has the expected structure
-                const processedOrder = {
-                  ...parsedOrder,
-                  orderItems: parsedOrder.orderItems || [],
-                  totalAmount: parsedOrder.totalAmount || 0
-                };
+        // Update local state
+        setOrder(newOrder);
+        localOrder = newOrder;
 
-                setOrder(processedOrder);
-              } catch (parseError) {
-                console.error('Error parsing order data as JSON:', parseError);
-                // If parsing fails, keep the local state
-              }
-            } else {
-              // Ensure the updated order has the expected structure
-              const processedOrder = {
-                ...updatedOrderData,
-                orderItems: updatedOrderData.orderItems || [],
-                totalAmount: updatedOrderData.totalAmount || 0
-              };
+        // Update table status locally
+        const updatedTable = { ...table, status: 'OCCUPIED', currentOrder: newOrder };
+        setTable(updatedTable);
+      }
 
-              setOrder(processedOrder);
-            }
-          }
-        } catch (addItemError) {
-          console.error('Error adding item to order in database:', addItemError);
+      // Now save to the database using the correct table cart endpoint: POST /api/orders/table/{tableId}/cart
+      console.log('Saving to database using correct API endpoint: POST /api/orders/table/' + tableId + '/cart');
 
-          // Try updating the entire order as a fallback
+      const itemToAdd = {
+        product: product,
+        quantity: 1,
+        unitPrice: product.price,
+        // If we have an existing order, include its ID
+        orderId: localOrder && localOrder.id !== Date.now() ? localOrder.id : null,
+        // Include number of guests for new orders
+        numberOfGuests: 1,
+        // Include special instructions if needed
+        specialInstructions: ""
+      };
+
+      console.log('Item data being sent to cart endpoint:', itemToAdd);
+      const savedOrder = await api.addItemToTableCart(tableId, itemToAdd);
+      console.log('Item added to table cart in database:', savedOrder);
+
+      // Process the saved order
+      if (savedOrder) {
+        // Check if savedOrder is a string (possibly a JSON string)
+        if (typeof savedOrder === 'string') {
           try {
-            const savedOrder = await api.updateOrder(order.id, locallyUpdatedOrder);
-            console.log('Order updated in database (fallback):', savedOrder);
+            console.log('Saved order is a string, attempting to parse as JSON');
+            const parsedOrder = JSON.parse(savedOrder);
+            console.log('Successfully parsed order data:', parsedOrder);
 
-            // Update state with the saved order if it was returned
-            if (savedOrder) {
-              // Check if savedOrder is a string (possibly a JSON string)
-              if (typeof savedOrder === 'string') {
-                try {
-                  console.log('Saved order is a string, attempting to parse as JSON');
-                  const parsedOrder = JSON.parse(savedOrder);
-                  console.log('Successfully parsed order data:', parsedOrder);
+            // Ensure the parsed order has the expected structure
+            const processedOrder = {
+              ...parsedOrder,
+              orderItems: parsedOrder.orderItems || [],
+              totalAmount: parsedOrder.totalAmount || 0
+            };
 
-                  // Ensure the parsed order has the expected structure
-                  const processedOrder = {
-                    ...parsedOrder,
-                    orderItems: parsedOrder.orderItems || [],
-                    totalAmount: parsedOrder.totalAmount || 0
-                  };
+            setOrder(processedOrder);
 
-                  setOrder(processedOrder);
-                } catch (parseError) {
-                  console.error('Error parsing order data as JSON:', parseError);
-                  // If parsing fails, keep the local state
-                }
-              } else {
-                // Ensure the saved order has the expected structure
-                const processedOrder = {
-                  ...savedOrder,
-                  orderItems: savedOrder.orderItems || [],
-                  totalAmount: savedOrder.totalAmount || 0
-                };
-
-                setOrder(processedOrder);
-              }
-            }
-          } catch (updateError) {
-            console.error('Error updating order in database (fallback):', updateError);
-            // We already updated the local state, so the UI is still responsive
+            // Update table status
+            const updatedTable = { ...table, status: 'OCCUPIED', currentOrder: processedOrder };
+            setTable(updatedTable);
+          } catch (parseError) {
+            console.error('Error parsing order data as JSON:', parseError);
+            // If parsing fails, keep the local state
           }
+        } else {
+          // Ensure the saved order has the expected structure
+          const processedOrder = {
+            ...savedOrder,
+            orderItems: savedOrder.orderItems || [],
+            totalAmount: savedOrder.totalAmount || 0
+          };
+
+          setOrder(processedOrder);
+
+          // Update table status
+          const updatedTable = { ...table, status: 'OCCUPIED', currentOrder: processedOrder };
+          setTable(updatedTable);
         }
       }
     } catch (error) {
@@ -753,35 +653,54 @@ const TableOrder = () => {
       // Continue with local state update even if all API calls fail
       // This ensures the UI remains responsive
 
-      // Ensure order.orderItems is an array
-      if (!order.orderItems) {
-        order.orderItems = [];
-      }
+      if (order) {
+        // Ensure order.orderItems is an array
+        if (!order.orderItems) {
+          order.orderItems = [];
+        }
 
-      // Check if product already exists in order
-      const existingItem = order.orderItems.find(item =>
-        item.product && item.product.id === product.id
-      );
+        // Check if product already exists in order
+        const existingItem = order.orderItems.find(item =>
+          item.product && item.product.id === product.id
+        );
 
-      if (existingItem) {
-        const updatedItems = order.orderItems.map(item => {
-          if (item.product && item.product.id === product.id) {
-            const newQuantity = item.quantity + 1;
-            return {
-              ...item,
-              quantity: newQuantity,
-              subtotal: newQuantity * item.unitPrice
-            };
-          }
-          return item;
-        });
+        if (existingItem) {
+          const updatedItems = order.orderItems.map(item => {
+            if (item.product && item.product.id === product.id) {
+              const newQuantity = item.quantity + 1;
+              return {
+                ...item,
+                quantity: newQuantity,
+                subtotal: newQuantity * item.unitPrice
+              };
+            }
+            return item;
+          });
 
-        setOrder({
-          ...order,
-          orderItems: updatedItems,
-          totalAmount: calculateTotal(updatedItems)
-        });
+          setOrder({
+            ...order,
+            orderItems: updatedItems,
+            totalAmount: calculateTotal(updatedItems)
+          });
+        } else {
+          const newItem = {
+            id: Date.now(), // Temporary ID
+            product: product,
+            quantity: 1,
+            unitPrice: product.price,
+            subtotal: product.price
+          };
+
+          const updatedItems = [...order.orderItems, newItem];
+
+          setOrder({
+            ...order,
+            orderItems: updatedItems,
+            totalAmount: calculateTotal(updatedItems)
+          });
+        }
       } else {
+        // Create a new local order if there's no existing order
         const newItem = {
           id: Date.now(), // Temporary ID
           product: product,
@@ -790,13 +709,23 @@ const TableOrder = () => {
           subtotal: product.price
         };
 
-        const updatedItems = [...order.orderItems, newItem];
+        const newOrder = {
+          id: Date.now(), // Temporary ID
+          tableId: parseInt(tableId),
+          orderNumber: `ORD-${Date.now()}`,
+          orderType: 'DINE_IN',
+          numberOfGuests: 1,
+          orderDate: new Date().toISOString(),
+          status: 'PENDING',
+          totalAmount: product.price,
+          orderItems: [newItem]
+        };
 
-        setOrder({
-          ...order,
-          orderItems: updatedItems,
-          totalAmount: calculateTotal(updatedItems)
-        });
+        setOrder(newOrder);
+
+        // Update table status locally
+        const updatedTable = { ...table, status: 'OCCUPIED', currentOrder: newOrder };
+        setTable(updatedTable);
       }
     }
   };
