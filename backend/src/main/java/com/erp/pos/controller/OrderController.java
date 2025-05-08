@@ -1,7 +1,12 @@
 package com.erp.pos.controller;
 
+import com.erp.pos.dto.AddToTableCartDTO;
+import com.erp.pos.dto.CreateTableOrderDTO;
+import com.erp.pos.dto.RemoveFromTableCartDTO;
+import com.erp.pos.dto.TableOrderResponseDTO;
 import com.erp.pos.model.Order;
 import com.erp.pos.model.OrderItem;
+import com.erp.pos.model.Product;
 import com.erp.pos.model.RestaurantTable;
 import com.erp.pos.model.User;
 import com.erp.pos.service.OrderService;
@@ -17,6 +22,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -206,16 +214,30 @@ public class OrderController {
      */
     @PostMapping("/table/{tableId}")
     @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
-    public ResponseEntity<Order> createTableOrder(
+    @ResponseStatus(HttpStatus.CREATED)
+    public TableOrderResponseDTO createTableOrder(
             @PathVariable Long tableId,
-            @Valid @RequestBody Order order,
+            @Valid @RequestBody CreateTableOrderDTO orderDTO,
             @AuthenticationPrincipal UserDetails userDetails) {
         // Get the table
         RestaurantTable table = tableService.getTableById(tableId);
 
-        // Set the table for the order
+        // Create a new Order entity from the DTO
+        Order order = new Order();
+        order.setOrderDate(LocalDateTime.now());
         order.setTable(table);
         order.setOrderType(Order.OrderType.DINE_IN);
+        order.setStatus(Order.OrderStatus.PENDING);
+        order.setTotalAmount(orderDTO.getTotalAmount());
+        order.setNumberOfGuests(orderDTO.getNumberOfGuests());
+        order.setSpecialInstructions(orderDTO.getSpecialInstructions());
+        order.setPaymentMethod(orderDTO.getPaymentMethod());
+        order.setPaymentReference(orderDTO.getPaymentReference());
+
+        // Set customer if provided
+        if (orderDTO.getCustomerId() != null) {
+            order.setCustomer(customerService.getCustomerById(orderDTO.getCustomerId()));
+        }
 
         // Set the current user as the creator of the order
         if (userDetails != null) {
@@ -225,13 +247,27 @@ public class OrderController {
             order.setCreatedBy(currentUser);
         }
 
+        // Convert order items from DTO
+        List<OrderItem> orderItems = new ArrayList<>();
+        for (CreateTableOrderDTO.OrderItemDTO itemDTO : orderDTO.getOrderItems()) {
+            OrderItem item = new OrderItem();
+            item.setOrder(order);
+            item.setProduct(productService.getProductById(itemDTO.getProductId()));
+            item.setQuantity(itemDTO.getQuantity());
+            item.setUnitPrice(itemDTO.getUnitPrice());
+            item.setSubtotal(itemDTO.getSubtotal());
+            orderItems.add(item);
+        }
+        order.setOrderItems(orderItems);
+
         // Create the order
         Order createdOrder = orderService.createOrder(order);
 
         // Update the table status to OCCUPIED and assign the order
         tableService.assignOrderToTable(tableId, createdOrder);
 
-        return new ResponseEntity<>(createdOrder, HttpStatus.CREATED);
+        // Convert to response DTO and return
+        return TableOrderResponseDTO.fromEntity(createdOrder);
     }
 
     /**
@@ -239,14 +275,247 @@ public class OrderController {
      */
     @GetMapping("/table/{tableId}/current")
     @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
-    public ResponseEntity<Order> getCurrentTableOrder(@PathVariable Long tableId) {
+    public ResponseEntity<TableOrderResponseDTO> getCurrentTableOrder(@PathVariable Long tableId) {
         RestaurantTable table = tableService.getTableById(tableId);
 
         if (table.getCurrentOrder() != null) {
             Order order = orderService.getOrderById(table.getCurrentOrder().getId());
-            return new ResponseEntity<>(order, HttpStatus.OK);
+            return new ResponseEntity<>(TableOrderResponseDTO.fromEntity(order), HttpStatus.OK);
         } else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    /**
+     * Get current cart for a table (PENDING order)
+     */
+    @GetMapping("/table/{tableId}/cart")
+    @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
+    public ResponseEntity<TableOrderResponseDTO> getTableCart(@PathVariable Long tableId) {
+        RestaurantTable table = tableService.getTableById(tableId);
+
+        if (table.getCurrentOrder() != null) {
+            Order order = orderService.getOrderById(table.getCurrentOrder().getId());
+
+            // Only return if the order is in PENDING status (cart state)
+            if (order.getStatus() == Order.OrderStatus.PENDING) {
+                return new ResponseEntity<>(TableOrderResponseDTO.fromEntity(order), HttpStatus.OK);
+            }
+        }
+
+        // If no PENDING order found, return NOT_FOUND
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+    }
+
+    /**
+     * Add item to table cart
+     */
+    @PostMapping("/table/{tableId}/cart")
+    @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
+    public ResponseEntity<TableOrderResponseDTO> addToTableCart(
+            @PathVariable Long tableId,
+            @Valid @RequestBody AddToTableCartDTO cartItemDTO,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        // Get the table
+        RestaurantTable table = tableService.getTableById(tableId);
+        Order order;
+
+        // Check if we need to create a new order or update an existing one
+        if (cartItemDTO.getOrderId() != null) {
+            // Use the provided order ID
+            order = orderService.getOrderById(cartItemDTO.getOrderId());
+
+            // Verify this order belongs to the specified table
+            if (order.getTable() == null || !order.getTable().getId().equals(tableId)) {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            }
+
+            // Verify the order is in PENDING status
+            if (order.getStatus() != Order.OrderStatus.PENDING) {
+                return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            }
+        } else {
+            // Check if there's an existing PENDING order for this table
+            if (table.getCurrentOrder() != null) {
+                Order currentOrder = orderService.getOrderById(table.getCurrentOrder().getId());
+                if (currentOrder.getStatus() == Order.OrderStatus.PENDING) {
+                    order = currentOrder;
+                } else {
+                    // Create a new order
+                    order = createNewOrder(table, cartItemDTO, userDetails);
+                }
+            } else {
+                // Create a new order
+                order = createNewOrder(table, cartItemDTO, userDetails);
+            }
+        }
+
+        // Add the item to the order
+        Product product = productService.getProductById(cartItemDTO.getProductId());
+
+        // Check if this product is already in the order
+        boolean productFound = false;
+        for (OrderItem item : order.getOrderItems()) {
+            if (item.getProduct().getId().equals(cartItemDTO.getProductId())) {
+                // Update existing item quantity and subtotal
+                item.setQuantity(item.getQuantity() + cartItemDTO.getQuantity());
+                item.setUnitPrice(cartItemDTO.getUnitPrice()); // Update unit price in case it changed
+                item.setSubtotal(item.getUnitPrice().multiply(new BigDecimal(item.getQuantity())));
+                productFound = true;
+                break;
+            }
+        }
+
+        // If product not found in order, add a new order item
+        if (!productFound) {
+            OrderItem newItem = new OrderItem();
+            newItem.setOrder(order);
+            newItem.setProduct(product);
+            newItem.setQuantity(cartItemDTO.getQuantity());
+            newItem.setUnitPrice(cartItemDTO.getUnitPrice());
+            newItem.setSubtotal(cartItemDTO.getUnitPrice().multiply(new BigDecimal(cartItemDTO.getQuantity())));
+            order.getOrderItems().add(newItem);
+        }
+
+        // Update order total amount
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        for (OrderItem item : order.getOrderItems()) {
+            totalAmount = totalAmount.add(item.getSubtotal());
+        }
+        order.setTotalAmount(totalAmount);
+
+        // Update special instructions if provided
+        if (cartItemDTO.getSpecialInstructions() != null) {
+            order.setSpecialInstructions(cartItemDTO.getSpecialInstructions());
+        }
+
+        // Save the updated order
+        Order updatedOrder = orderService.updateOrder(order.getId(), order);
+
+        // If this is a new order, assign it to the table
+        if (table.getCurrentOrder() == null) {
+            tableService.assignOrderToTable(tableId, updatedOrder);
+        }
+
+        // Return the updated order
+        return new ResponseEntity<>(TableOrderResponseDTO.fromEntity(updatedOrder), HttpStatus.OK);
+    }
+
+    /**
+     * Helper method to create a new order
+     */
+    private Order createNewOrder(RestaurantTable table, AddToTableCartDTO cartItemDTO, UserDetails userDetails) {
+        Order order = new Order();
+        order.setOrderDate(LocalDateTime.now());
+        order.setTable(table);
+        order.setOrderType(Order.OrderType.DINE_IN);
+        order.setStatus(Order.OrderStatus.PENDING);
+
+        // Set number of guests if provided
+        if (cartItemDTO.getNumberOfGuests() != null) {
+            order.setNumberOfGuests(cartItemDTO.getNumberOfGuests());
+        } else {
+            // Default to 1 guest if not specified
+            order.setNumberOfGuests(1);
+        }
+
+        // Set special instructions if provided
+        if (cartItemDTO.getSpecialInstructions() != null) {
+            order.setSpecialInstructions(cartItemDTO.getSpecialInstructions());
+        }
+
+        // Set the current user as the creator of the order
+        if (userDetails != null) {
+            User currentUser = new User();
+            currentUser.setUsername(userDetails.getUsername());
+            currentUser.setId(1L); // This is a simplification - in a real app, you'd look up the user ID
+            order.setCreatedBy(currentUser);
+        }
+
+        // Initialize order items list
+        order.setOrderItems(new ArrayList<>());
+
+        // Initialize total amount
+        order.setTotalAmount(BigDecimal.ZERO);
+
+        // Save the new order
+        return orderService.createOrder(order);
+    }
+
+    /**
+     * Remove item from table cart
+     */
+    @DeleteMapping("/table/{tableId}/cart")
+    @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
+    public ResponseEntity<TableOrderResponseDTO> removeFromTableCart(
+            @PathVariable Long tableId,
+            @Valid @RequestBody RemoveFromTableCartDTO removeItemDTO) {
+
+        // Get the order
+        Order order = orderService.getOrderById(removeItemDTO.getOrderId());
+
+        // Verify this order belongs to the specified table
+        if (order.getTable() == null || !order.getTable().getId().equals(tableId)) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+
+        // Verify the order is in PENDING status
+        if (order.getStatus() != Order.OrderStatus.PENDING) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+
+        // Find the order item for the specified product
+        OrderItem itemToUpdate = null;
+        for (OrderItem item : order.getOrderItems()) {
+            if (item.getProduct().getId().equals(removeItemDTO.getProductId())) {
+                itemToUpdate = item;
+                break;
+            }
+        }
+
+        // If item not found, return error
+        if (itemToUpdate == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        // Check if we should remove the entire item or just reduce quantity
+        if (removeItemDTO.isRemoveEntireItem() || itemToUpdate.getQuantity() <= removeItemDTO.getQuantity()) {
+            // Remove the entire item
+            order.getOrderItems().remove(itemToUpdate);
+        } else {
+            // Reduce the quantity
+            itemToUpdate.setQuantity(itemToUpdate.getQuantity() - removeItemDTO.getQuantity());
+            // Update the subtotal
+            itemToUpdate.setSubtotal(itemToUpdate.getUnitPrice().multiply(new BigDecimal(itemToUpdate.getQuantity())));
+        }
+
+        // Update order total amount
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        for (OrderItem item : order.getOrderItems()) {
+            totalAmount = totalAmount.add(item.getSubtotal());
+        }
+        order.setTotalAmount(totalAmount);
+
+        // If all items are removed, consider canceling the order
+        if (order.getOrderItems().isEmpty()) {
+            // Option 1: Cancel the order
+            order.setStatus(Order.OrderStatus.CANCELLED);
+
+            // Save the updated order
+            Order updatedOrder = orderService.updateOrder(order.getId(), order);
+
+            // Clear the table
+            tableService.clearTable(tableId);
+
+            // Return the cancelled order
+            return new ResponseEntity<>(TableOrderResponseDTO.fromEntity(updatedOrder), HttpStatus.OK);
+        } else {
+            // Save the updated order
+            Order updatedOrder = orderService.updateOrder(order.getId(), order);
+
+            // Return the updated order
+            return new ResponseEntity<>(TableOrderResponseDTO.fromEntity(updatedOrder), HttpStatus.OK);
         }
     }
 
@@ -290,7 +559,7 @@ public class OrderController {
 
         // Return both the completed order and the cleared table
         Map<String, Object> response = Map.of(
-            "order", completedOrder,
+            "order", TableOrderResponseDTO.fromEntity(completedOrder),
             "table", clearedTable
         );
 

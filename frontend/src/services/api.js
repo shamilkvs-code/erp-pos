@@ -451,8 +451,64 @@ export const createOrder = async (order) => {
 export const updateOrder = async (id, order) => {
   try {
     console.log(`Updating order ${id} with data:`, order);
-    const response = await axios.put(`${API_URL}/orders/${id}`, order);
+
+    // Get the token from localStorage
+    const userStr = localStorage.getItem('user');
+    let token = null;
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        token = user.token;
+      } catch (e) {
+        console.error('Error parsing user from localStorage:', e);
+      }
+    }
+
+    // If no token in user object, try fallback
+    if (!token) {
+      token = localStorage.getItem('token');
+    }
+
+    // Log token status
+    console.log('Token status for updateOrder request:', token ? 'Token exists' : 'No token');
+
+    // Make sure order has all required fields
+    const orderData = {
+      ...order,
+      orderDate: order.orderDate || new Date().toISOString(),
+      status: order.status || 'PENDING',
+      orderItems: order.orderItems || []
+    };
+
+    // Calculate total amount if not provided
+    if (!orderData.totalAmount && orderData.orderItems.length > 0) {
+      orderData.totalAmount = orderData.orderItems.reduce((total, item) => total + (item.subtotal || 0), 0);
+    }
+
+    const response = await axios.put(`${API_URL}/orders/${id}`, orderData, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
+    });
+
     console.log('Order update response:', response.data);
+
+    // Check if response.data is a string and try to parse it
+    if (typeof response.data === 'string') {
+      try {
+        console.log('Response data is a string, attempting to parse as JSON');
+        const parsedData = JSON.parse(response.data);
+        console.log('Successfully parsed response data:', parsedData);
+        return parsedData;
+      } catch (parseError) {
+        console.error('Error parsing response data as JSON:', parseError);
+        // If parsing fails, return the original data
+        return response.data;
+      }
+    }
+
     return response.data;
   } catch (error) {
     console.error('Error in updateOrder:', error.response?.data || error.message);
@@ -487,11 +543,71 @@ export const getOrdersByTable = async (tableId) => {
   }
 };
 
-export const getCurrentTableOrder = async (tableId) => {
+export const getCurrentTableOrder = async (tableId, signal) => {
   try {
-    const response = await axios.get(`${API_URL}/orders/table/${tableId}/current`);
+    console.log(`Fetching current order for table ${tableId}`);
+
+    // Get the token from localStorage
+    const userStr = localStorage.getItem('user');
+    let token = null;
+
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        token = user.token;
+      } catch (e) {
+        console.error('Error parsing user from localStorage:', e);
+      }
+    }
+
+    // If no token in user object, try fallback
+    if (!token) {
+      token = localStorage.getItem('token');
+    }
+
+    // Log token status
+    console.log('Token status for getCurrentTableOrder request:', token ? 'Token exists' : 'No token');
+
+    const response = await axios.get(`${API_URL}/orders/table/${tableId}/current`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      signal: signal // Pass the abort signal if provided
+    });
+
+    console.log('Current table order response:', response.data);
+
+    // Check if response.data is a string and try to parse it
+    if (typeof response.data === 'string') {
+      try {
+        console.log('Response data is a string, attempting to parse as JSON');
+        const parsedData = JSON.parse(response.data);
+        console.log('Successfully parsed response data:', parsedData);
+        return parsedData;
+      } catch (parseError) {
+        console.error('Error parsing response data as JSON:', parseError);
+        // If parsing fails, return the original data
+        return response.data;
+      }
+    }
+
     return response.data;
   } catch (error) {
+    // If the request was aborted, propagate the abort error
+    if (error.name === 'AbortError' || error.name === 'CanceledError') {
+      console.log(`Current order request for table ${tableId} was aborted`);
+      throw error;
+    }
+
+    console.error(`Error fetching current order for table ${tableId}:`, error.response?.data || error.message);
+
+    // If the error is 404 (Not Found), it means there's no current order for this table
+    if (error.response && error.response.status === 404) {
+      console.log(`No current order found for table ${tableId}`);
+      return null;
+    }
+
     throw error;
   }
 };
@@ -529,6 +645,21 @@ export const createTableOrder = async (tableId, order) => {
     });
 
     console.log('Create table order response:', response.data);
+
+    // Check if response.data is a string and try to parse it
+    if (typeof response.data === 'string') {
+      try {
+        console.log('Response data is a string, attempting to parse as JSON');
+        const parsedData = JSON.parse(response.data);
+        console.log('Successfully parsed response data:', parsedData);
+        return parsedData;
+      } catch (parseError) {
+        console.error('Error parsing response data as JSON:', parseError);
+        // If parsing fails, return the original data
+        return response.data;
+      }
+    }
+
     return response.data;
   } catch (error) {
     console.error('Error in createTableOrder:', error.response?.data || error.message);
@@ -579,6 +710,21 @@ export const addItemToOrder = async (orderId, item) => {
     });
 
     console.log('Add item response:', response.data);
+
+    // Check if response.data is a string and try to parse it
+    if (typeof response.data === 'string') {
+      try {
+        console.log('Response data is a string, attempting to parse as JSON');
+        const parsedData = JSON.parse(response.data);
+        console.log('Successfully parsed response data:', parsedData);
+        return parsedData;
+      } catch (parseError) {
+        console.error('Error parsing response data as JSON:', parseError);
+        // If parsing fails, return the original data
+        return response.data;
+      }
+    }
+
     return response.data;
   } catch (error) {
     console.error('Error in addItemToOrder:', error.response?.data || error.message);
@@ -625,6 +771,21 @@ export const addItemToOrder = async (orderId, item) => {
       });
 
       console.log('Update order response (fallback):', updateResponse.data);
+
+      // Check if response.data is a string and try to parse it
+      if (typeof updateResponse.data === 'string') {
+        try {
+          console.log('Response data is a string, attempting to parse as JSON');
+          const parsedData = JSON.parse(updateResponse.data);
+          console.log('Successfully parsed response data:', parsedData);
+          return parsedData;
+        } catch (parseError) {
+          console.error('Error parsing response data as JSON:', parseError);
+          // If parsing fails, return the original data
+          return updateResponse.data;
+        }
+      }
+
       return updateResponse.data;
     } catch (fallbackError) {
       console.error('Error in addItemToOrder fallback:', fallbackError.response?.data || fallbackError.message);

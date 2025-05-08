@@ -76,13 +76,60 @@ const TableOrder = () => {
         console.log('Received table data:', tableData);
         setTable(tableData);
 
-        // Get order data if table is occupied
-        if (tableData.status === 'OCCUPIED' && tableData.currentOrder) {
-          console.log('Table is occupied, setting order data');
-          setOrder(tableData.currentOrder);
-        } else {
-          console.log('Table is not occupied or has no order');
-          setOrder(null);
+        // Try to get the current order for this table
+        try {
+          console.log('Fetching current order for table:', tableId);
+          const currentOrder = await api.getCurrentTableOrder(tableId, signal);
+          console.log('Current order data:', currentOrder);
+
+          if (currentOrder) {
+            console.log('Setting current order data');
+
+            // Check if currentOrder is a string (possibly a JSON string)
+            if (typeof currentOrder === 'string') {
+              try {
+                console.log('Current order is a string, attempting to parse as JSON');
+                const parsedOrder = JSON.parse(currentOrder);
+                console.log('Successfully parsed order data:', parsedOrder);
+
+                // Ensure the parsed order has the expected structure
+                const processedOrder = {
+                  ...parsedOrder,
+                  orderItems: parsedOrder.orderItems || [],
+                  totalAmount: parsedOrder.totalAmount || 0
+                };
+
+                setOrder(processedOrder);
+              } catch (parseError) {
+                console.error('Error parsing order data as JSON:', parseError);
+                // If parsing fails, set order to null
+                setOrder(null);
+              }
+            } else {
+              // Ensure the order has the expected structure
+              const processedOrder = {
+                ...currentOrder,
+                orderItems: currentOrder.orderItems || [],
+                totalAmount: currentOrder.totalAmount || 0
+              };
+
+              setOrder(processedOrder);
+            }
+          } else {
+            console.log('No current order found for this table');
+            setOrder(null);
+          }
+        } catch (orderError) {
+          console.error('Error fetching current order:', orderError);
+
+          // Fallback to using the order from table data
+          if (tableData.status === 'OCCUPIED' && tableData.currentOrder) {
+            console.log('Falling back to order data from table');
+            setOrder(tableData.currentOrder);
+          } else {
+            console.log('No order data available');
+            setOrder(null);
+          }
         }
 
         // Get products
@@ -237,8 +284,36 @@ const TableOrder = () => {
   }, [tableId, dataFetched]);
 
   // Handle back button
-  const handleBack = () => {
-    navigate('/dashboard/tables');
+  const handleBack = async () => {
+    try {
+      // If there's an active order, make sure it's saved to the database before navigating away
+      if (order) {
+        console.log('Saving order before navigating back:', order);
+
+        // Ensure order has all required fields
+        const orderToSave = {
+          ...order,
+          orderDate: order.orderDate || new Date().toISOString(),
+          status: order.status || 'PENDING',
+          orderItems: order.orderItems || [],
+          totalAmount: order.totalAmount || calculateTotal(order.orderItems || [])
+        };
+
+        try {
+          // Update the order in the database
+          await api.updateOrder(order.id, orderToSave);
+          console.log('Order saved successfully before navigation');
+        } catch (error) {
+          console.error('Error saving order before navigation:', error);
+          // Continue with navigation even if save fails
+        }
+      }
+    } catch (error) {
+      console.error('Error in handleBack:', error);
+    } finally {
+      // Navigate back to tables screen
+      navigate('/dashboard/tables');
+    }
   };
 
   // Handle search query change
@@ -382,12 +457,38 @@ const TableOrder = () => {
           const createdOrder = await api.createOrderForTable(tableId, newOrder);
           console.log('Order created successfully:', createdOrder);
 
-          // Ensure the created order has the expected structure
-          const processedOrder = {
-            ...createdOrder,
-            orderItems: createdOrder.orderItems || [],
-            totalAmount: createdOrder.totalAmount || 0
-          };
+          // Check if createdOrder is a string (possibly a JSON string)
+          let processedOrder;
+          if (typeof createdOrder === 'string') {
+            try {
+              console.log('Created order is a string, attempting to parse as JSON');
+              const parsedOrder = JSON.parse(createdOrder);
+              console.log('Successfully parsed order data:', parsedOrder);
+
+              // Ensure the parsed order has the expected structure
+              processedOrder = {
+                ...parsedOrder,
+                orderItems: parsedOrder.orderItems || [],
+                totalAmount: parsedOrder.totalAmount || 0
+              };
+            } catch (parseError) {
+              console.error('Error parsing order data as JSON:', parseError);
+              // If parsing fails, use the original order data
+              processedOrder = {
+                ...newOrder,
+                id: Date.now(), // Generate a temporary ID
+                orderItems: newOrder.orderItems || [],
+                totalAmount: newOrder.totalAmount || 0
+              };
+            }
+          } else {
+            // Ensure the created order has the expected structure
+            processedOrder = {
+              ...createdOrder,
+              orderItems: createdOrder.orderItems || [],
+              totalAmount: createdOrder.totalAmount || 0
+            };
+          }
 
           // Make sure orderItems have all required fields
           if (processedOrder.orderItems.length > 0) {
@@ -495,7 +596,35 @@ const TableOrder = () => {
 
           // Update state with the saved order if it was returned
           if (savedOrder) {
-            setOrder(savedOrder);
+            // Check if savedOrder is a string (possibly a JSON string)
+            if (typeof savedOrder === 'string') {
+              try {
+                console.log('Saved order is a string, attempting to parse as JSON');
+                const parsedOrder = JSON.parse(savedOrder);
+                console.log('Successfully parsed order data:', parsedOrder);
+
+                // Ensure the parsed order has the expected structure
+                const processedOrder = {
+                  ...parsedOrder,
+                  orderItems: parsedOrder.orderItems || [],
+                  totalAmount: parsedOrder.totalAmount || 0
+                };
+
+                setOrder(processedOrder);
+              } catch (parseError) {
+                console.error('Error parsing order data as JSON:', parseError);
+                // If parsing fails, keep the local state
+              }
+            } else {
+              // Ensure the saved order has the expected structure
+              const processedOrder = {
+                ...savedOrder,
+                orderItems: savedOrder.orderItems || [],
+                totalAmount: savedOrder.totalAmount || 0
+              };
+
+              setOrder(processedOrder);
+            }
           }
         } catch (updateError) {
           console.error('Error updating order in database:', updateError);
@@ -541,7 +670,35 @@ const TableOrder = () => {
 
           // Update state with the saved order if it was returned
           if (updatedOrderData) {
-            setOrder(updatedOrderData);
+            // Check if updatedOrderData is a string (possibly a JSON string)
+            if (typeof updatedOrderData === 'string') {
+              try {
+                console.log('Updated order is a string, attempting to parse as JSON');
+                const parsedOrder = JSON.parse(updatedOrderData);
+                console.log('Successfully parsed order data:', parsedOrder);
+
+                // Ensure the parsed order has the expected structure
+                const processedOrder = {
+                  ...parsedOrder,
+                  orderItems: parsedOrder.orderItems || [],
+                  totalAmount: parsedOrder.totalAmount || 0
+                };
+
+                setOrder(processedOrder);
+              } catch (parseError) {
+                console.error('Error parsing order data as JSON:', parseError);
+                // If parsing fails, keep the local state
+              }
+            } else {
+              // Ensure the updated order has the expected structure
+              const processedOrder = {
+                ...updatedOrderData,
+                orderItems: updatedOrderData.orderItems || [],
+                totalAmount: updatedOrderData.totalAmount || 0
+              };
+
+              setOrder(processedOrder);
+            }
           }
         } catch (addItemError) {
           console.error('Error adding item to order in database:', addItemError);
@@ -553,7 +710,35 @@ const TableOrder = () => {
 
             // Update state with the saved order if it was returned
             if (savedOrder) {
-              setOrder(savedOrder);
+              // Check if savedOrder is a string (possibly a JSON string)
+              if (typeof savedOrder === 'string') {
+                try {
+                  console.log('Saved order is a string, attempting to parse as JSON');
+                  const parsedOrder = JSON.parse(savedOrder);
+                  console.log('Successfully parsed order data:', parsedOrder);
+
+                  // Ensure the parsed order has the expected structure
+                  const processedOrder = {
+                    ...parsedOrder,
+                    orderItems: parsedOrder.orderItems || [],
+                    totalAmount: parsedOrder.totalAmount || 0
+                  };
+
+                  setOrder(processedOrder);
+                } catch (parseError) {
+                  console.error('Error parsing order data as JSON:', parseError);
+                  // If parsing fails, keep the local state
+                }
+              } else {
+                // Ensure the saved order has the expected structure
+                const processedOrder = {
+                  ...savedOrder,
+                  orderItems: savedOrder.orderItems || [],
+                  totalAmount: savedOrder.totalAmount || 0
+                };
+
+                setOrder(processedOrder);
+              }
             }
           } catch (updateError) {
             console.error('Error updating order in database (fallback):', updateError);
