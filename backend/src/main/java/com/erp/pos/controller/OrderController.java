@@ -13,13 +13,13 @@ import com.erp.pos.service.OrderService;
 import com.erp.pos.service.ProductService;
 import com.erp.pos.service.CustomerService;
 import com.erp.pos.service.TableService;
+import com.erp.pos.util.SecurityUtils;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
+
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -106,12 +106,12 @@ public class OrderController {
      */
     @PostMapping
     @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
-    public ResponseEntity<Order> createOrder(@Valid @RequestBody Order order, @AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<Order> createOrder(@Valid @RequestBody Order order) {
         // Set the current user as the creator of the order
-        User currentUser = new User();
-        currentUser.setId(1L); // This should be replaced with actual user ID from authentication
-
-        order.setCreatedBy(currentUser);
+        User currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser != null) {
+            order.setCreatedBy(currentUser);
+        }
 
         Order createdOrder = orderService.createOrder(order);
         return new ResponseEntity<>(createdOrder, HttpStatus.CREATED);
@@ -217,8 +217,7 @@ public class OrderController {
     @ResponseStatus(HttpStatus.CREATED)
     public TableOrderResponseDTO createTableOrder(
             @PathVariable Long tableId,
-            @Valid @RequestBody CreateTableOrderDTO orderDTO,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @Valid @RequestBody CreateTableOrderDTO orderDTO) {
         // Get the table
         RestaurantTable table = tableService.getTableById(tableId);
 
@@ -240,10 +239,8 @@ public class OrderController {
         }
 
         // Set the current user as the creator of the order
-        if (userDetails != null) {
-            User currentUser = new User();
-            currentUser.setUsername(userDetails.getUsername());
-            currentUser.setId(1L); // This is a simplification - in a real app, you'd look up the user ID
+        User currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser != null) {
             order.setCreatedBy(currentUser);
         }
 
@@ -314,8 +311,7 @@ public class OrderController {
     @PreAuthorize("hasRole('CASHIER') or hasRole('MANAGER') or hasRole('ADMIN')")
     public ResponseEntity<TableOrderResponseDTO> addToTableCart(
             @PathVariable Long tableId,
-            @Valid @RequestBody AddToTableCartDTO cartItemDTO,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @Valid @RequestBody AddToTableCartDTO cartItemDTO) {
 
         // Get the table
         RestaurantTable table = tableService.getTableById(tableId);
@@ -343,11 +339,11 @@ public class OrderController {
                     order = currentOrder;
                 } else {
                     // Create a new order
-                    order = createNewOrder(table, cartItemDTO, userDetails);
+                    order = createNewOrder(table, cartItemDTO);
                 }
             } else {
                 // Create a new order
-                order = createNewOrder(table, cartItemDTO, userDetails);
+                order = createNewOrder(table, cartItemDTO);
             }
         }
 
@@ -405,7 +401,7 @@ public class OrderController {
     /**
      * Helper method to create a new order
      */
-    private Order createNewOrder(RestaurantTable table, AddToTableCartDTO cartItemDTO, UserDetails userDetails) {
+    private Order createNewOrder(RestaurantTable table, AddToTableCartDTO cartItemDTO) {
         Order order = new Order();
         order.setOrderDate(LocalDateTime.now());
         order.setTable(table);
@@ -426,10 +422,8 @@ public class OrderController {
         }
 
         // Set the current user as the creator of the order
-        if (userDetails != null) {
-            User currentUser = new User();
-            currentUser.setUsername(userDetails.getUsername());
-            currentUser.setId(1L); // This is a simplification - in a real app, you'd look up the user ID
+        User currentUser = SecurityUtils.getCurrentUser();
+        if (currentUser != null) {
             order.setCreatedBy(currentUser);
         }
 

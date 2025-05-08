@@ -58,42 +58,53 @@ public class TableController {
     }
 
     /**
-     * Get tables by status
+     * Get tables with optional filtering by status, location, and minimum capacity.
+     * All parameters are optional and can be combined for more specific filtering.
+     *
+     * @param status Optional table status filter (e.g., "OCCUPIED", "AVAILABLE", "CLEANING")
+     * @param location Optional location filter
+     * @param capacity Optional minimum capacity filter
+     * @return List of tables matching the specified criteria
      */
-    @GetMapping("/status/{status}")
-    public ResponseEntity<List<TableDTO>> getTablesByStatus(@PathVariable String status) {
+    @GetMapping("/filter")
+    public ResponseEntity<List<TableDTO>> getTablesWithFilters(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) Integer capacity) {
+        
         try {
-            RestaurantTable.TableStatus tableStatus = RestaurantTable.TableStatus.valueOf(status.toUpperCase());
-            List<RestaurantTable> tables = tableService.getTablesByStatus(tableStatus);
+            List<RestaurantTable> tables = tableService.getAllTables();
+            
+            // Apply status filter if provided
+            if (status != null && !status.isEmpty()) {
+                RestaurantTable.TableStatus tableStatus = RestaurantTable.TableStatus.valueOf(status.toUpperCase());
+                tables = tables.stream()
+                        .filter(table -> table.getStatus() == tableStatus)
+                        .collect(Collectors.toList());
+            }
+            
+            // Apply location filter if provided
+            if (location != null && !location.isEmpty()) {
+                tables = tables.stream()
+                        .filter(table -> location.equalsIgnoreCase(table.getLocation()))
+                        .collect(Collectors.toList());
+            }
+            
+            // Apply capacity filter if provided
+            if (capacity != null) {
+                tables = tables.stream()
+                        .filter(table -> table.getCapacity() >= capacity)
+                        .collect(Collectors.toList());
+            }
+            
             List<TableDTO> tableDTOs = tables.stream()
                     .map(TableDTO::fromEntity)
                     .collect(Collectors.toList());
+                    
             return new ResponseEntity<>(tableDTOs, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
-    }
-
-    /**
-     * Get tables by location
-     */
-    @GetMapping("/location/{location}")
-    public List<TableDTO> getTablesByLocation(@PathVariable String location) {
-        List<RestaurantTable> tables = tableService.getTablesByLocation(location);
-        return tables.stream()
-                .map(TableDTO::fromEntity)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Get tables by minimum capacity
-     */
-    @GetMapping("/capacity/{capacity}")
-    public List<TableDTO> getTablesByMinCapacity(@PathVariable Integer capacity) {
-        List<RestaurantTable> tables = tableService.getTablesByMinCapacity(capacity);
-        return tables.stream()
-                .map(TableDTO::fromEntity)
-                .collect(Collectors.toList());
     }
 
     /**
