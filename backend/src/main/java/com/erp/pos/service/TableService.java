@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface TableService {
     List<RestaurantTable> getAllTables();
+    List<RestaurantTable> getFilteredTables(String status, String location, Integer capacity);
     RestaurantTable getTableById(Long id);
     Optional<RestaurantTable> getTableByNumber(String tableNumber);
     List<RestaurantTable> getTablesByStatus(RestaurantTable.TableStatus status);

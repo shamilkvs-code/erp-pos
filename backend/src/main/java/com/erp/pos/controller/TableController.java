@@ -73,37 +73,17 @@ public class TableController {
             @RequestParam(required = false) Integer capacity) {
         
         try {
-            List<RestaurantTable> tables = tableService.getAllTables();
-            
-            // Apply status filter if provided
-            if (status != null && !status.isEmpty()) {
-                RestaurantTable.TableStatus tableStatus = RestaurantTable.TableStatus.valueOf(status.toUpperCase());
-                tables = tables.stream()
-                        .filter(table -> table.getStatus() == tableStatus)
-                        .collect(Collectors.toList());
-            }
-            
-            // Apply location filter if provided
-            if (location != null && !location.isEmpty()) {
-                tables = tables.stream()
-                        .filter(table -> location.equalsIgnoreCase(table.getLocation()))
-                        .collect(Collectors.toList());
-            }
-            
-            // Apply capacity filter if provided
-            if (capacity != null) {
-                tables = tables.stream()
-                        .filter(table -> table.getCapacity() >= capacity)
-                        .collect(Collectors.toList());
-            }
-            
+            // Use the service method to get filtered tables
+            List<RestaurantTable> tables = tableService.getFilteredTables(status, location, capacity);
+
+            // Convert to DTOs
             List<TableDTO> tableDTOs = tables.stream()
                     .map(TableDTO::fromEntity)
                     .collect(Collectors.toList());
                     
-            return new ResponseEntity<>(tableDTOs, HttpStatus.OK);
+            return ResponseEntity.ok(tableDTOs);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+            return ResponseEntity.badRequest().build();
         }
     }
 

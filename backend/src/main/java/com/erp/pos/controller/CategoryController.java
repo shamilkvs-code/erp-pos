@@ -2,8 +2,7 @@ package com.erp.pos.controller;
 
 import com.erp.pos.dto.CategoryDTO;
 import com.erp.pos.model.Category;
-import com.erp.pos.repository.CategoryRepository;
-import com.erp.pos.exception.ResourceNotFoundException;
+import com.erp.pos.service.CategoryService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -21,11 +20,11 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/categories")
 public class CategoryController {
     @Autowired
-    private CategoryRepository categoryRepository;
+    private CategoryService categoryService;
 
     @GetMapping
     public List<CategoryDTO> getAllCategories() {
-        List<Category> categories = categoryRepository.findAll();
+        List<Category> categories = categoryService.getAllCategories();
         return categories.stream()
                 .map(CategoryDTO::fromEntity)
                 .collect(Collectors.toList());
@@ -33,14 +32,13 @@ public class CategoryController {
 
     @GetMapping("/{id}")
     public CategoryDTO getCategoryById(@PathVariable Long id) {
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+        Category category = categoryService.getCategoryById(id);
         return CategoryDTO.fromEntity(category);
     }
 
     @GetMapping("/search")
     public List<CategoryDTO> searchCategories(@RequestParam String name) {
-        List<Category> categories = categoryRepository.findByNameContainingIgnoreCase(name);
+        List<Category> categories = categoryService.searchCategoriesByName(name);
         return categories.stream()
                 .map(CategoryDTO::fromEntity)
                 .collect(Collectors.toList());
@@ -49,22 +47,14 @@ public class CategoryController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CategoryDTO createCategory(@Valid @RequestBody Category category) {
-        // Ensure no products are attached when creating
-        category.setProducts(null);
-        Category newCategory = categoryRepository.save(category);
+        Category newCategory = categoryService.createCategory(category);
         return CategoryDTO.fromEntity(newCategory);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('MANAGER') or hasRole('ADMIN')")
     public CategoryDTO updateCategory(@PathVariable Long id, @Valid @RequestBody Category categoryDetails) {
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
-
-        category.setName(categoryDetails.getName());
-        category.setDescription(categoryDetails.getDescription());
-
-        Category updatedCategory = categoryRepository.save(category);
+        Category updatedCategory = categoryService.updateCategory(id, categoryDetails);
         return CategoryDTO.fromEntity(updatedCategory);
     }
 
@@ -72,8 +62,6 @@ public class CategoryController {
     @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCategory(@PathVariable Long id) {
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
-        categoryRepository.delete(category);
+        categoryService.deleteCategory(id);
     }
 }

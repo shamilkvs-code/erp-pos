@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class TableServiceImpl implements TableService {
@@ -21,6 +22,38 @@ public class TableServiceImpl implements TableService {
     @Override
     public List<RestaurantTable> getAllTables() {
         return tableRepository.findAll();
+    }
+
+    @Override
+    public List<RestaurantTable> getFilteredTables(String status, String location, Integer capacity) {
+        return getAllTables().stream()
+            .filter(table -> {
+                // Status filter
+                if (status != null && !status.isEmpty()) {
+                    try {
+                        RestaurantTable.TableStatus tableStatus = RestaurantTable.TableStatus.valueOf(status.toUpperCase());
+                        if (table.getStatus() != tableStatus) {
+                            return false;
+                        }
+                    } catch (IllegalArgumentException e) {
+                        // Invalid status, don't apply this filter
+                    }
+                }
+                
+                // Location filter
+                if (location != null && !location.isEmpty() && 
+                    !location.equalsIgnoreCase(table.getLocation())) {
+                    return false;
+                }
+                
+                // Capacity filter
+                if (capacity != null && table.getCapacity() < capacity) {
+                    return false;
+                }
+                
+                return true;
+            })
+            .collect(Collectors.toList());
     }
 
     @Override
