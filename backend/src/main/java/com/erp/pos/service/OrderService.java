@@ -7,7 +7,6 @@ import com.erp.pos.enums.OrderStatus;
 import com.erp.pos.enums.OrderType;
 import com.erp.pos.model.Order;
 import com.erp.pos.model.OrderItem;
-import com.erp.pos.model.RestaurantTable;
 
 import java.util.List;
 import java.util.Map;

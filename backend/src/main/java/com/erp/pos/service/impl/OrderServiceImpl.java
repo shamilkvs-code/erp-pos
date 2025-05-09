@@ -1,9 +1,6 @@
 package com.erp.pos.service.impl;
 
-import com.erp.pos.dto.AddToTableCartDTO;
-import com.erp.pos.dto.CreateTableOrderDTO;
-import com.erp.pos.dto.RemoveFromTableCartDTO;
-import com.erp.pos.dto.TableOrderResponseDTO;
+import com.erp.pos.dto.*;
 import com.erp.pos.enums.OrderStatus;
 import com.erp.pos.enums.OrderType;
 import com.erp.pos.enums.PaymentMethod;
@@ -253,7 +250,7 @@ public class OrderServiceImpl implements OrderService {
 
         // Convert order items from DTO
         List<OrderItem> orderItems = new ArrayList<>();
-        for (CreateTableOrderDTO.OrderItemDTO itemDTO : orderDTO.getOrderItems()) {
+        for (OrderItemDTO itemDTO : orderDTO.getOrderItems()) {
             OrderItem item = new OrderItem();
             item.setOrder(order);
             item.setProduct(productService.getProductById(itemDTO.getProductId()));

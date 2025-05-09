@@ -4,12 +4,9 @@ import com.erp.pos.enums.OrderStatus;
 import com.erp.pos.enums.OrderType;
 import com.erp.pos.enums.PaymentMethod;
 import com.erp.pos.model.Order;
-import com.erp.pos.model.OrderItem;
 import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,10 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
-@AllArgsConstructor
 @Schema(description = "DTO for table order response")
 public class TableOrderResponseDTO {
     @Schema(description = "Order ID")
@@ -124,48 +119,5 @@ public class TableOrderResponseDTO {
         dto.setUpdatedAt(order.getUpdatedAt());
 
         return dto;
-    }
-
-    // Nested DTO for order items
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Schema(description = "DTO for order items in a table order response")
-    public static class OrderItemDTO {
-        @Schema(description = "Order item ID")
-        private Long id;
-
-        @Schema(description = "Product ID")
-        private Long productId;
-
-        @Schema(description = "Product name")
-        private String productName;
-
-        @Schema(description = "Quantity of the product")
-        private Integer quantity;
-
-        @Schema(description = "Unit price of the product")
-        private BigDecimal unitPrice;
-
-        @Schema(description = "Subtotal for this item (quantity * unit price)")
-        private BigDecimal subtotal;
-
-        // Convert from OrderItem entity to OrderItemDTO
-        public static OrderItemDTO fromEntity(OrderItem item) {
-            OrderItemDTO dto = new OrderItemDTO();
-            dto.setId(item.getId());
-
-            if (item.getProduct() != null) {
-                dto.setProductId(item.getProduct().getId());
-                dto.setProductName(item.getProduct().getName());
-            }
-
-            dto.setQuantity(item.getQuantity());
-            dto.setUnitPrice(item.getUnitPrice());
-            dto.setSubtotal(item.getSubtotal());
-
-            return dto;
-        }
     }
 }

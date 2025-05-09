@@ -46,28 +46,6 @@ public class CreateTableOrderDTO {
     @Schema(description = "Payment reference - optional at order creation time")
     private String paymentReference;
 
-    // Nested DTO for order items to avoid circular references
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Schema(description = "DTO for order items within a table order")
-    public static class OrderItemDTO {
-        @Schema(description = "ID of the product", required = true)
-        @NotNull(message = "Product ID is required")
-        private Long productId;
-
-        @Schema(description = "Quantity of the product", minimum = "1", required = true)
-        @NotNull(message = "Quantity is required")
-        @Min(value = 1, message = "Quantity must be at least 1")
-        private Integer quantity;
-
-        @Schema(description = "Unit price of the product", required = true)
-        @NotNull(message = "Unit price is required")
-        private BigDecimal unitPrice;
-
-        @Schema(description = "Subtotal for this item (quantity * unit price)", required = true)
-        @NotNull(message = "Subtotal is required")
-        private BigDecimal subtotal;
-    }
+    @Schema(description = "Order item")
+    private OrderItem orderItem;
 }
