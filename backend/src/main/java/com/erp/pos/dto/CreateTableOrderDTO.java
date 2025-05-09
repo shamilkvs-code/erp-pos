@@ -2,6 +2,7 @@ package com.erp.pos.dto;
 
 import com.erp.pos.model.Order;
 import com.erp.pos.model.OrderItem;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -17,49 +18,55 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(description = "DTO for creating a new order for a table")
 public class CreateTableOrderDTO {
-    // Customer ID is optional
+    @Schema(description = "Customer ID - optional")
     private Long customerId;
-    
-    // Number of guests is required for table orders
+
+    @Schema(description = "Number of guests at the table", minimum = "1", required = true)
     @NotNull(message = "Number of guests is required")
     @Min(value = 1, message = "Number of guests must be at least 1")
     private Integer numberOfGuests;
-    
-    // Order items are required
+
+    @Schema(description = "List of order items", required = true)
     @NotNull(message = "Order items are required")
     @NotEmpty(message = "Order items cannot be empty")
     private List<OrderItemDTO> orderItems;
-    
-    // Special instructions are optional
+
+    @Schema(description = "Special instructions for the order")
     private String specialInstructions;
-    
-    // Total amount is required
+
+    @Schema(description = "Total amount of the order", required = true)
     @NotNull(message = "Total amount is required")
     private BigDecimal totalAmount;
-    
-    // Payment method is optional at order creation time
+
+    @Schema(description = "Payment method - optional at order creation time", enumAsRef = true)
     private Order.PaymentMethod paymentMethod;
-    
-    // Payment reference is optional at order creation time
+
+    @Schema(description = "Payment reference - optional at order creation time")
     private String paymentReference;
-    
+
     // Nested DTO for order items to avoid circular references
     @Getter
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
+    @Schema(description = "DTO for order items within a table order")
     public static class OrderItemDTO {
+        @Schema(description = "ID of the product", required = true)
         @NotNull(message = "Product ID is required")
         private Long productId;
-        
+
+        @Schema(description = "Quantity of the product", minimum = "1", required = true)
         @NotNull(message = "Quantity is required")
         @Min(value = 1, message = "Quantity must be at least 1")
         private Integer quantity;
-        
+
+        @Schema(description = "Unit price of the product", required = true)
         @NotNull(message = "Unit price is required")
         private BigDecimal unitPrice;
-        
+
+        @Schema(description = "Subtotal for this item (quantity * unit price)", required = true)
         @NotNull(message = "Subtotal is required")
         private BigDecimal subtotal;
     }
