@@ -1,6 +1,6 @@
 package com.erp.pos.dto;
 
-import com.erp.pos.model.Order;
+import com.erp.pos.enums.PaymentMethod;
 import com.erp.pos.model.OrderItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
@@ -41,7 +41,7 @@ public class CreateTableOrderDTO {
     private BigDecimal totalAmount;
 
     @Schema(description = "Payment method - optional at order creation time", enumAsRef = true)
-    private Order.PaymentMethod paymentMethod;
+    private PaymentMethod paymentMethod;
 
     @Schema(description = "Payment reference - optional at order creation time")
     private String paymentReference;

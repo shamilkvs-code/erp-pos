@@ -1,5 +1,6 @@
 package com.erp.pos.model;
 
+import com.erp.pos.enums.TableStatus;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -41,8 +42,4 @@ public class RestaurantTable extends BaseEntity {
     private Integer width;
     private Integer height;
     private String shape; // "RECTANGLE", "CIRCLE", "CUSTOM"
-
-    public enum TableStatus {
-        AVAILABLE, OCCUPIED, RESERVED, CLEANING, MAINTENANCE
-    }
 }

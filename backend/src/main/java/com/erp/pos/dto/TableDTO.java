@@ -1,5 +1,6 @@
 package com.erp.pos.dto;
 
+import com.erp.pos.enums.TableStatus;
 import com.erp.pos.model.RestaurantTable;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -16,7 +17,7 @@ public class TableDTO {
     private Long id;
     private String tableNumber;
     private Integer capacity;
-    private RestaurantTable.TableStatus status;
+    private TableStatus status;
     private String location;
     private Integer positionX;
     private Integer positionY;
@@ -25,7 +26,7 @@ public class TableDTO {
     private String shape;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    
+
     // Include only the order ID if there is a current order
     private Long currentOrderId;
 
@@ -44,12 +45,12 @@ public class TableDTO {
         dto.setShape(table.getShape());
         dto.setCreatedAt(table.getCreatedAt());
         dto.setUpdatedAt(table.getUpdatedAt());
-        
+
         // Set the current order ID if there is one
         if (table.getCurrentOrder() != null) {
             dto.setCurrentOrderId(table.getCurrentOrder().getId());
         }
-        
+
         return dto;
     }
 }

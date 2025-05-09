@@ -1,5 +1,8 @@
 package com.erp.pos.dto;
 
+import com.erp.pos.enums.OrderStatus;
+import com.erp.pos.enums.OrderType;
+import com.erp.pos.enums.PaymentMethod;
 import com.erp.pos.model.Order;
 import com.erp.pos.model.OrderItem;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -48,13 +51,13 @@ public class TableOrderResponseDTO {
     private BigDecimal totalAmount;
 
     @Schema(description = "Order status", enumAsRef = true)
-    private Order.OrderStatus status;
+    private OrderStatus status;
 
     @Schema(description = "Order type", enumAsRef = true)
-    private Order.OrderType orderType;
+    private OrderType orderType;
 
     @Schema(description = "Payment method", enumAsRef = true)
-    private Order.PaymentMethod paymentMethod;
+    private PaymentMethod paymentMethod;
 
     @Schema(description = "Payment reference")
     private String paymentReference;

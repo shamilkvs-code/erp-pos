@@ -1,5 +1,8 @@
 package com.erp.pos.model;
 
+import com.erp.pos.enums.OrderStatus;
+import com.erp.pos.enums.OrderType;
+import com.erp.pos.enums.PaymentMethod;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -60,16 +63,4 @@ public class Order extends BaseEntity {
     private Integer numberOfGuests;
 
     private String specialInstructions;
-
-    public enum OrderStatus {
-        PENDING, IN_PROGRESS, READY, COMPLETED, CANCELLED
-    }
-
-    public enum OrderType {
-        DINE_IN, TAKEOUT, DELIVERY
-    }
-
-    public enum PaymentMethod {
-        CASH, CREDIT_CARD, DEBIT_CARD, MOBILE_PAYMENT
-    }
 }

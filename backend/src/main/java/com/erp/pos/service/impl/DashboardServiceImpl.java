@@ -2,6 +2,7 @@ package com.erp.pos.service.impl;
 
 import com.erp.pos.dto.DashboardStatsDTO;
 import com.erp.pos.dto.RecentOrderDTO;
+import com.erp.pos.enums.OrderStatus;
 import com.erp.pos.model.Order;
 import com.erp.pos.repository.CustomerRepository;
 import com.erp.pos.repository.OrderRepository;
@@ -43,7 +44,7 @@ public class DashboardServiceImpl implements DashboardService {
         // Calculate total revenue from all completed orders
         BigDecimal totalRevenue;
         try {
-            totalRevenue = orderRepository.findByStatus(Order.OrderStatus.COMPLETED)
+            totalRevenue = orderRepository.findByStatus(OrderStatus.COMPLETED)
                     .stream()
                     .map(Order::getTotalAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);

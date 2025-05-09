@@ -1,5 +1,7 @@
 package com.erp.pos.controller;
 
+import com.erp.pos.enums.OrderStatus;
+import com.erp.pos.enums.OrderType;
 import com.erp.pos.exception.ResourceNotFoundException;
 import com.erp.pos.model.Order;
 import com.erp.pos.model.OrderItem;
@@ -115,7 +117,7 @@ public class OrderController {
             @Parameter(description = "Status to filter orders by (PENDING, IN_PROGRESS, READY, COMPLETED, CANCELLED)", required = true)
             @PathVariable String status) {
         try {
-            Order.OrderStatus orderStatus = Order.OrderStatus.valueOf(status.toUpperCase());
+            OrderStatus orderStatus = OrderStatus.valueOf(status.toUpperCase());
             List<Order> orders = orderService.getOrdersByStatus(orderStatus);
             return new ResponseEntity<>(orders, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
@@ -231,7 +233,7 @@ public class OrderController {
             }
 
             Order order = orderService.getOrderById(id);
-            order.setStatus(Order.OrderStatus.valueOf(status.toUpperCase()));
+            order.setStatus(OrderStatus.valueOf(status.toUpperCase()));
 
             Order updatedOrder = orderService.updateOrder(id, order);
             return new ResponseEntity<>(updatedOrder, HttpStatus.OK);
@@ -253,7 +255,7 @@ public class OrderController {
             @Parameter(description = "Order type to filter by (DINE_IN, TAKEAWAY, DELIVERY)", required = true)
             @PathVariable String orderType) {
         try {
-            Order.OrderType type = Order.OrderType.valueOf(orderType.toUpperCase());
+            OrderType type = OrderType.valueOf(orderType.toUpperCase());
             List<Order> orders = orderService.getOrdersByType(type);
             return new ResponseEntity<>(orders, HttpStatus.OK);
         } catch (IllegalArgumentException e) {

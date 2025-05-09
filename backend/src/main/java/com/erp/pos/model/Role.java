@@ -1,5 +1,6 @@
 package com.erp.pos.model;
 
+import com.erp.pos.enums.ERole;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -21,11 +22,4 @@ public class Role {
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private ERole name;
-
-    public enum ERole {
-        ROLE_USER,
-        ROLE_CASHIER,
-        ROLE_MANAGER,
-        ROLE_ADMIN
-    }
 }

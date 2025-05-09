@@ -1,6 +1,7 @@
 package com.erp.pos.controller;
 
 import com.erp.pos.dto.TableDTO;
+import com.erp.pos.enums.TableStatus;
 import com.erp.pos.model.Order;
 import com.erp.pos.model.RestaurantTable;
 import com.erp.pos.service.OrderService;
@@ -169,7 +170,7 @@ public class TableController {
                 return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
             }
 
-            RestaurantTable.TableStatus tableStatus = RestaurantTable.TableStatus.valueOf(status.toUpperCase());
+            TableStatus tableStatus = TableStatus.valueOf(status.toUpperCase());
             RestaurantTable updatedTable = tableService.changeTableStatus(tableId, tableStatus);
             return new ResponseEntity<>(TableDTO.fromEntity(updatedTable), HttpStatus.OK);
         } catch (IllegalArgumentException e) {
@@ -233,12 +234,12 @@ public class TableController {
         RestaurantTable table = tableService.getTableById(tableId);
 
         // Check if the table is in CLEANING status
-        if (table.getStatus() != RestaurantTable.TableStatus.CLEANING) {
+        if (table.getStatus() != TableStatus.CLEANING) {
             throw new IllegalStateException("Table must be in CLEANING status to mark as available");
         }
 
         // Change the table status to AVAILABLE
-        RestaurantTable updatedTable = tableService.changeTableStatus(tableId, RestaurantTable.TableStatus.AVAILABLE);
+        RestaurantTable updatedTable = tableService.changeTableStatus(tableId, TableStatus.AVAILABLE);
         return TableDTO.fromEntity(updatedTable);
     }
 }

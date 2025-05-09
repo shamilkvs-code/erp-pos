@@ -4,6 +4,9 @@ import com.erp.pos.dto.AddToTableCartDTO;
 import com.erp.pos.dto.CreateTableOrderDTO;
 import com.erp.pos.dto.RemoveFromTableCartDTO;
 import com.erp.pos.dto.TableOrderResponseDTO;
+import com.erp.pos.enums.OrderStatus;
+import com.erp.pos.enums.OrderType;
+import com.erp.pos.enums.PaymentMethod;
 import com.erp.pos.exception.ResourceNotFoundException;
 import com.erp.pos.model.Order;
 import com.erp.pos.model.OrderItem;
@@ -75,12 +78,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public List<Order> getOrdersByStatus(Order.OrderStatus status) {
+    public List<Order> getOrdersByStatus(OrderStatus status) {
         return orderRepository.findByStatus(status);
     }
 
     @Override
-    public List<Order> getOrdersByType(Order.OrderType orderType) {
+    public List<Order> getOrdersByType(OrderType orderType) {
         return orderRepository.findByOrderType(orderType);
     }
 
@@ -104,17 +107,17 @@ public class OrderServiceImpl implements OrderService {
 
         // Set default status if not provided
         if (order.getStatus() == null) {
-            order.setStatus(Order.OrderStatus.PENDING);
+            order.setStatus(OrderStatus.PENDING);
         }
 
         // Set default order type if not provided
         if (order.getOrderType() == null) {
             // If table is set, it's a dine-in order
             if (order.getTable() != null) {
-                order.setOrderType(Order.OrderType.DINE_IN);
+                order.setOrderType(OrderType.DINE_IN);
             } else {
                 // Default to takeout if no table is specified
-                order.setOrderType(Order.OrderType.TAKEOUT);
+                order.setOrderType(OrderType.TAKEOUT);
             }
         }
 
@@ -229,8 +232,8 @@ public class OrderServiceImpl implements OrderService {
         Order order = new Order();
         order.setOrderDate(LocalDateTime.now());
         order.setTable(table);
-        order.setOrderType(Order.OrderType.DINE_IN);
-        order.setStatus(Order.OrderStatus.PENDING);
+        order.setOrderType(OrderType.DINE_IN);
+        order.setStatus(OrderStatus.PENDING);
         order.setTotalAmount(orderDTO.getTotalAmount());
         order.setNumberOfGuests(orderDTO.getNumberOfGuests());
         order.setSpecialInstructions(orderDTO.getSpecialInstructions());
@@ -289,7 +292,7 @@ public class OrderServiceImpl implements OrderService {
             Order order = getOrderById(table.getCurrentOrder().getId());
 
             // Return the order if it's not COMPLETED or CANCELLED
-            if (order.getStatus() != Order.OrderStatus.COMPLETED && order.getStatus() != Order.OrderStatus.CANCELLED) {
+            if (order.getStatus() != OrderStatus.COMPLETED && order.getStatus() != OrderStatus.CANCELLED) {
                 return Optional.of(order);
             }
         }
@@ -315,7 +318,7 @@ public class OrderServiceImpl implements OrderService {
             }
 
             // Verify the order is not COMPLETED or CANCELLED
-            if (order.getStatus() == Order.OrderStatus.COMPLETED || order.getStatus() == Order.OrderStatus.CANCELLED) {
+            if (order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.CANCELLED) {
                 throw new IllegalArgumentException("Cannot add items to a completed or cancelled order");
             }
         } else {
@@ -323,7 +326,7 @@ public class OrderServiceImpl implements OrderService {
             if (table.getCurrentOrder() != null) {
                 Order currentOrder = getOrderById(table.getCurrentOrder().getId());
                 // Allow adding items to any order that is not COMPLETED or CANCELLED
-                if (currentOrder.getStatus() != Order.OrderStatus.COMPLETED && currentOrder.getStatus() != Order.OrderStatus.CANCELLED) {
+                if (currentOrder.getStatus() != OrderStatus.COMPLETED && currentOrder.getStatus() != OrderStatus.CANCELLED) {
                     order = currentOrder;
                 } else {
                     // Create a new order
@@ -343,7 +346,7 @@ public class OrderServiceImpl implements OrderService {
 
         // Only update quantity for existing items if the order is still in PENDING status
         // For orders that are IN_PROGRESS or READY, always add as new line items
-        if (order.getStatus() == Order.OrderStatus.PENDING) {
+        if (order.getStatus() == OrderStatus.PENDING) {
             for (OrderItem item : order.getOrderItems()) {
                 if (item.getProduct().getId().equals(cartItemDTO.getProductId())) {
                     // Update existing item quantity and subtotal only if order is still PENDING
@@ -397,8 +400,8 @@ public class OrderServiceImpl implements OrderService {
         Order order = new Order();
         order.setOrderDate(LocalDateTime.now());
         order.setTable(table);
-        order.setOrderType(Order.OrderType.DINE_IN);
-        order.setStatus(Order.OrderStatus.PENDING);
+        order.setOrderType(OrderType.DINE_IN);
+        order.setStatus(OrderStatus.PENDING);
 
         // Set number of guests if provided
         if (cartItemDTO.getNumberOfGuests() != null) {
@@ -441,7 +444,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Verify the order is not COMPLETED or CANCELLED
-        if (order.getStatus() == Order.OrderStatus.COMPLETED || order.getStatus() == Order.OrderStatus.CANCELLED) {
+        if (order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.CANCELLED) {
             throw new IllegalArgumentException("Cannot remove items from a completed or cancelled order");
         }
 
@@ -479,7 +482,7 @@ public class OrderServiceImpl implements OrderService {
         // If all items are removed, consider canceling the order
         if (order.getOrderItems().isEmpty()) {
             // Cancel the order
-            order.setStatus(Order.OrderStatus.CANCELLED);
+            order.setStatus(OrderStatus.CANCELLED);
 
             // Save the updated order
             Order updatedOrder = updateOrder(order.getId(), order);
@@ -505,13 +508,13 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Update order status to COMPLETED
-        order.setStatus(Order.OrderStatus.COMPLETED);
+        order.setStatus(OrderStatus.COMPLETED);
 
         // Update payment information if provided
         if (paymentDetails != null) {
             if (paymentDetails.containsKey("paymentMethod")) {
                 String paymentMethod = (String) paymentDetails.get("paymentMethod");
-                order.setPaymentMethod(Order.PaymentMethod.valueOf(paymentMethod.toUpperCase()));
+                order.setPaymentMethod(PaymentMethod.valueOf(paymentMethod.toUpperCase()));
             }
 
             if (paymentDetails.containsKey("paymentReference")) {
@@ -538,9 +541,9 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public Order updateOrderStatus(Long orderId, String status) {
         // Validate the status string
-        Order.OrderStatus orderStatus;
+        OrderStatus orderStatus;
         try {
-            orderStatus = Order.OrderStatus.valueOf(status.toUpperCase());
+            orderStatus = OrderStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid order status: " + status);
         }

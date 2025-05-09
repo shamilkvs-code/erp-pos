@@ -1,5 +1,6 @@
 package com.erp.pos.service;
 
+import com.erp.pos.enums.TableStatus;
 import com.erp.pos.model.Order;
 import com.erp.pos.model.RestaurantTable;
 
@@ -11,7 +12,7 @@ public interface TableService {
     List<RestaurantTable> getFilteredTables(String status, String location, Integer capacity);
     RestaurantTable getTableById(Long id);
     Optional<RestaurantTable> getTableByNumber(String tableNumber);
-    List<RestaurantTable> getTablesByStatus(RestaurantTable.TableStatus status);
+    List<RestaurantTable> getTablesByStatus(TableStatus status);
     List<RestaurantTable> getTablesByLocation(String location);
     List<RestaurantTable> getTablesByMinCapacity(Integer capacity);
     RestaurantTable createTable(RestaurantTable table);
@@ -19,5 +20,5 @@ public interface TableService {
     void deleteTable(Long id);
     RestaurantTable assignOrderToTable(Long tableId, Order order);
     RestaurantTable clearTable(Long tableId);
-    RestaurantTable changeTableStatus(Long tableId, RestaurantTable.TableStatus status);
+    RestaurantTable changeTableStatus(Long tableId, TableStatus status);
 }

@@ -4,6 +4,7 @@ import com.erp.pos.dto.request.LoginRequest;
 import com.erp.pos.dto.request.SignupRequest;
 import com.erp.pos.dto.response.JwtResponse;
 import com.erp.pos.dto.response.MessageResponse;
+import com.erp.pos.enums.ERole;
 import com.erp.pos.model.Role;
 import com.erp.pos.model.User;
 import com.erp.pos.repository.RoleRepository;
@@ -52,15 +53,15 @@ public class AuthController {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtils.generateJwtToken(authentication);
-        
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();        
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(item -> item.getAuthority())
                 .collect(Collectors.toList());
 
-        return ResponseEntity.ok(new JwtResponse(jwt, 
-                                                 userDetails.getId(), 
-                                                 userDetails.getUsername(), 
+        return ResponseEntity.ok(new JwtResponse(jwt,
+                                                 userDetails.getId(),
+                                                 userDetails.getUsername(),
                                                  userDetails.getEmail(),
                                                  userDetails.getFullName(),
                                                  roles));
@@ -91,29 +92,29 @@ public class AuthController {
         Set<Role> roles = new HashSet<>();
 
         if (strRoles == null) {
-            Role userRole = roleRepository.findByName(Role.ERole.ROLE_USER)
+            Role userRole = roleRepository.findByName(ERole.ROLE_USER)
                     .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
             roles.add(userRole);
         } else {
             strRoles.forEach(role -> {
                 switch (role) {
                 case "admin":
-                    Role adminRole = roleRepository.findByName(Role.ERole.ROLE_ADMIN)
+                    Role adminRole = roleRepository.findByName(ERole.ROLE_ADMIN)
                             .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
                     roles.add(adminRole);
                     break;
                 case "manager":
-                    Role modRole = roleRepository.findByName(Role.ERole.ROLE_MANAGER)
+                    Role modRole = roleRepository.findByName(ERole.ROLE_MANAGER)
                             .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
                     roles.add(modRole);
                     break;
                 case "cashier":
-                    Role cashierRole = roleRepository.findByName(Role.ERole.ROLE_CASHIER)
+                    Role cashierRole = roleRepository.findByName(ERole.ROLE_CASHIER)
                             .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
                     roles.add(cashierRole);
                     break;
                 default:
-                    Role userRole = roleRepository.findByName(Role.ERole.ROLE_USER)
+                    Role userRole = roleRepository.findByName(ERole.ROLE_USER)
                             .orElseThrow(() -> new RuntimeException("Error: Role is not found."));
                     roles.add(userRole);
                 }

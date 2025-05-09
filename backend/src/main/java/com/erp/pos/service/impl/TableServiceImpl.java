@@ -1,5 +1,6 @@
 package com.erp.pos.service.impl;
 
+import com.erp.pos.enums.TableStatus;
 import com.erp.pos.exception.ResourceNotFoundException;
 import com.erp.pos.model.Order;
 import com.erp.pos.model.RestaurantTable;
@@ -31,7 +32,7 @@ public class TableServiceImpl implements TableService {
                 // Status filter
                 if (status != null && !status.isEmpty()) {
                     try {
-                        RestaurantTable.TableStatus tableStatus = RestaurantTable.TableStatus.valueOf(status.toUpperCase());
+                        TableStatus tableStatus = TableStatus.valueOf(status.toUpperCase());
                         if (table.getStatus() != tableStatus) {
                             return false;
                         }
@@ -39,18 +40,18 @@ public class TableServiceImpl implements TableService {
                         // Invalid status, don't apply this filter
                     }
                 }
-                
+
                 // Location filter
-                if (location != null && !location.isEmpty() && 
+                if (location != null && !location.isEmpty() &&
                     !location.equalsIgnoreCase(table.getLocation())) {
                     return false;
                 }
-                
+
                 // Capacity filter
                 if (capacity != null && table.getCapacity() < capacity) {
                     return false;
                 }
-                
+
                 return true;
             })
             .collect(Collectors.toList());
@@ -68,7 +69,7 @@ public class TableServiceImpl implements TableService {
     }
 
     @Override
-    public List<RestaurantTable> getTablesByStatus(RestaurantTable.TableStatus status) {
+    public List<RestaurantTable> getTablesByStatus(TableStatus status) {
         return tableRepository.findByStatus(status);
     }
 
@@ -87,7 +88,7 @@ public class TableServiceImpl implements TableService {
     public RestaurantTable createTable(RestaurantTable table) {
         // Set default status if not provided
         if (table.getStatus() == null) {
-            table.setStatus(RestaurantTable.TableStatus.AVAILABLE);
+            table.setStatus(TableStatus.AVAILABLE);
         }
 
         return tableRepository.save(table);
@@ -119,12 +120,12 @@ public class TableServiceImpl implements TableService {
         RestaurantTable table = getTableById(tableId);
 
         // Check if table is available
-        if (table.getStatus() != RestaurantTable.TableStatus.AVAILABLE && table.getStatus() != RestaurantTable.TableStatus.RESERVED) {
+        if (table.getStatus() != TableStatus.AVAILABLE && table.getStatus() != TableStatus.RESERVED) {
             throw new IllegalStateException("Table is not available for assignment");
         }
 
         table.setCurrentOrder(order);
-        table.setStatus(RestaurantTable.TableStatus.OCCUPIED);
+        table.setStatus(TableStatus.OCCUPIED);
 
         return tableRepository.save(table);
     }
@@ -135,14 +136,14 @@ public class TableServiceImpl implements TableService {
         RestaurantTable table = getTableById(tableId);
 
         table.setCurrentOrder(null);
-        table.setStatus(RestaurantTable.TableStatus.CLEANING);
+        table.setStatus(TableStatus.CLEANING);
 
         return tableRepository.save(table);
     }
 
     @Override
     @Transactional
-    public RestaurantTable changeTableStatus(Long tableId, RestaurantTable.TableStatus status) {
+    public RestaurantTable changeTableStatus(Long tableId, TableStatus status) {
         RestaurantTable table = getTableById(tableId);
 
         table.setStatus(status);
